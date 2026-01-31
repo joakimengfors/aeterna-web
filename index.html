@@ -20,7 +20,7 @@
             background: var(--bg-darkest);
         }
 
-        #top-bar { grid-column: 1 / -1; }
+        #top-bar { grid-column: 1 / -1; position: relative; z-index: 3; }
 
         #left-panel {
             display: flex;
@@ -30,6 +30,8 @@
             overflow-y: auto;
             background: var(--bg-dark);
             border-right: 1px solid var(--surface-border);
+            z-index: 2;
+            position: relative;
         }
 
         #map-area {
@@ -456,6 +458,14 @@
         .dialog-btn-secondary:hover {
             border-color: var(--text-secondary);
             color: var(--text-secondary);
+        }
+        .dialog-btn-cancel {
+            border: 1px solid var(--error);
+            background: transparent;
+            color: var(--error);
+        }
+        .dialog-btn-cancel:hover {
+            background: rgba(255, 80, 80, 0.1);
         }
         .action-marker {
             padding: 3px 8px; border-radius: 4px;
@@ -963,20 +973,6 @@
             font-size: var(--font-size-sm); color: var(--text-secondary);
             font-weight: 500;
         }
-        .top-btn-cancel {
-            display: flex !important; align-items: center; gap: 4px;
-            width: auto !important; padding: 4px 12px !important;
-            color: var(--error) !important;
-            border-color: rgba(239, 83, 80, 0.3) !important;
-        }
-        .top-btn-cancel:hover {
-            background: rgba(239, 83, 80, 0.1) !important;
-        }
-        .cancel-label {
-            font-size: var(--font-size-xs); font-weight: 600;
-            text-transform: uppercase; letter-spacing: 1px;
-        }
-
         /* Dialog action choice grid */
         .dialog-body-actions { padding: var(--spacing-md); }
         .dialog-action-grid {

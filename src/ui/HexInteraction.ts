@@ -71,7 +71,6 @@ export class HexInteraction {
     this.dialog = dialog;
 
     this.board.setHexClickHandler((hexId) => this.onHexClick(hexId));
-    this.topBar.setOnCancel(() => this.onUndo());
     this.showTurnBanner(() => this.renderAll());
   }
 
@@ -84,7 +83,6 @@ export class HexInteraction {
     this.board.render(this.state);
     this.board.clearHighlights();
     this.playerPanel.render(this.state);
-    this.topBar.setOnCancel(() => this.onUndo());
     this.topBar.render(this.state);
 
     // Update character switcher
@@ -222,7 +220,7 @@ export class HexInteraction {
             this.board.render(this.state);
             this.board.highlightValidTargets(targets, this.state.currentPlayer);
             this.topBar.render(this.state);
-            this.dialog.showInfo('Raise Mountain', instruction);
+            this.dialog.showInfo('Raise Mountain', instruction, () => this.onUndo());
           },
         },
       ]);
@@ -252,7 +250,7 @@ export class HexInteraction {
               this.board.render(this.state);
               this.board.highlightValidTargets(moveTargets, 'fire');
               this.topBar.render(this.state);
-              this.dialog.showInfo('Flame Dash', instruction);
+              this.dialog.showInfo('Flame Dash', instruction, () => this.onUndo());
             },
           },
           {
@@ -291,7 +289,7 @@ export class HexInteraction {
     this.board.render(this.state);
     this.board.highlightValidTargets(targets, this.state.currentPlayer);
     this.topBar.render(this.state);
-    this.dialog.showInfo(displayName, instruction);
+    this.dialog.showInfo(displayName, instruction, () => this.onUndo());
   }
 
   private handleSpecialAbility() {
@@ -399,7 +397,7 @@ export class HexInteraction {
     this.board.render(this.state);
     this.board.highlightValidTargets(targets, this.state.currentPlayer);
     this.topBar.render(this.state);
-    this.dialog.showInfo('Swap Places', 'Choose 2 elementals to swap places');
+    this.dialog.showInfo('Swap Places', 'Choose 2 elementals to swap places', () => this.onUndo());
   }
 
   // ==========================================
@@ -516,7 +514,7 @@ export class HexInteraction {
         this.board.render(this.state);
         this.board.highlightValidTargets(targets, this.state.currentPlayer);
         this.topBar.render(this.state);
-        this.dialog.showInfo('Raise Mountain', instruction);
+        this.dialog.showInfo('Raise Mountain', instruction, () => this.onUndo());
       } else {
         // Step 0 was move — apply movement
         const earth = this.state.getPlayer('earth');
@@ -531,7 +529,7 @@ export class HexInteraction {
         this.board.render(this.state);
         this.board.highlightValidTargets(targets, this.state.currentPlayer);
         this.topBar.render(this.state);
-        this.dialog.showInfo('Raise Mountain', instruction);
+        this.dialog.showInfo('Raise Mountain', instruction, () => this.onUndo());
       }
     } else {
       this.actionTargets.push(hexId);
@@ -622,7 +620,7 @@ export class HexInteraction {
       this.board.highlightValidTargets(this.validTargets, this.state.currentPlayer);
       this.board.highlightSelected(hexId);
       this.topBar.render(this.state);
-      this.dialog.showInfo('Conjure Lakes', instruction);
+      this.dialog.showInfo('Conjure Lakes', instruction, () => this.onUndo());
     }
   }
 
@@ -668,7 +666,7 @@ export class HexInteraction {
     this.board.render(this.state);
     this.board.highlightValidTargets(moveTargets, this.state.currentPlayer);
     this.topBar.render(this.state);
-    this.dialog.showInfo('Firestorm', instruction);
+    this.dialog.showInfo('Firestorm', instruction, () => this.onUndo());
   }
 
   private handleFlameDashStep(hexId: HexId) {
@@ -696,7 +694,7 @@ export class HexInteraction {
         this.board.highlightValidTargets(remaining, this.state.currentPlayer);
         this.board.highlightSelected(hexId);
         this.topBar.render(this.state);
-        this.dialog.showInfo('Swap Places', 'Now choose the second elemental');
+        this.dialog.showInfo('Swap Places', 'Now choose the second elemental', () => this.onUndo());
       } else {
         // Both picked — confirm
         this.state.phase = 'CONFIRM';

@@ -62,8 +62,8 @@ export class GameDialog {
     });
   }
 
-  showSOT(elementalType: ElementalType, onSkip: () => void) {
-    this.cancelCallback = null;
+  showSOT(elementalType: ElementalType, onSkip: () => void, onCancel?: () => void) {
+    this.cancelCallback = onCancel ? () => { this.hide(); onCancel(); } : null;
     this.content.innerHTML = `
       <div class="dialog-header">
         <div class="dialog-title">Start of Turn</div>
@@ -73,11 +73,16 @@ export class GameDialog {
       </div>
       <div class="dialog-actions">
         <button class="dialog-btn dialog-btn-secondary" data-idx="skip">Skip</button>
+        ${onCancel ? '<button class="dialog-btn dialog-btn-cancel" data-idx="cancel">Cancel</button>' : ''}
       </div>
     `;
     this.content.querySelector('[data-idx="skip"]')!.addEventListener('click', () => {
       this.hide();
       onSkip();
+    });
+    this.content.querySelector('[data-idx="cancel"]')?.addEventListener('click', () => {
+      this.hide();
+      if (onCancel) onCancel();
     });
     // Non-blocking: let clicks pass through overlay to hexes beneath
     this.overlay.style.pointerEvents = 'none';
@@ -177,8 +182,8 @@ export class GameDialog {
     this.show();
   }
 
-  showInfoWithSkip(title: string, message: string, onSkip: () => void) {
-    this.cancelCallback = null;
+  showInfoWithSkip(title: string, message: string, onSkip: () => void, onCancel?: () => void) {
+    this.cancelCallback = onCancel ? () => { this.hide(); onCancel(); } : null;
     this.content.innerHTML = `
       <div class="dialog-header">
         <div class="dialog-title">${title}</div>
@@ -188,10 +193,15 @@ export class GameDialog {
       </div>
       <div class="dialog-actions">
         <button class="dialog-btn dialog-btn-secondary" data-idx="skip">Skip</button>
+        ${onCancel ? '<button class="dialog-btn dialog-btn-cancel" data-idx="cancel">Cancel</button>' : ''}
       </div>
     `;
     this.content.querySelector('[data-idx="skip"]')!.addEventListener('click', () => {
       onSkip();
+    });
+    this.content.querySelector('[data-idx="cancel"]')?.addEventListener('click', () => {
+      this.hide();
+      if (onCancel) onCancel();
     });
     // Non-blocking
     this.overlay.style.pointerEvents = 'none';
@@ -199,8 +209,8 @@ export class GameDialog {
     this.show();
   }
 
-  showInfo(title: string, message: string) {
-    this.cancelCallback = null;
+  showInfo(title: string, message: string, onCancel?: () => void) {
+    this.cancelCallback = onCancel ? () => { this.hide(); onCancel(); } : null;
     this.content.innerHTML = `
       <div class="dialog-header">
         <div class="dialog-title">${title}</div>
@@ -208,12 +218,21 @@ export class GameDialog {
       <div class="dialog-body">
         <div class="dialog-message">${message}</div>
       </div>
+      ${onCancel ? '<div class="dialog-actions"><button class="dialog-btn dialog-btn-cancel" data-idx="cancel">Cancel</button></div>' : ''}
     `;
+    if (onCancel) {
+      this.content.querySelector('[data-idx="cancel"]')!.addEventListener('click', () => {
+        this.hide();
+        onCancel();
+      });
+    }
     // Non-blocking: let clicks pass through to hexes, auto-dismissed on next hex click
     this.overlay.style.pointerEvents = 'none';
     this.content.style.pointerEvents = 'auto';
-    // Click dialog itself to dismiss
-    this.content.addEventListener('click', () => this.hide(), { once: true });
+    // Click dialog itself to dismiss (but not the cancel button area)
+    if (!onCancel) {
+      this.content.addEventListener('click', () => this.hide(), { once: true });
+    }
     this.show();
   }
 

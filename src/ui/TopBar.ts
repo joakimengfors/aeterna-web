@@ -12,13 +12,7 @@ const ELEMENTAL_NAMES: Record<ElementalType, string> = {
 };
 
 export class TopBar {
-  private onCancel: (() => void) | null = null;
-
   constructor(private container: HTMLElement) {}
-
-  setOnCancel(cb: (() => void) | null) {
-    this.onCancel = cb;
-  }
 
   render(state: GameState) {
     const type = state.currentPlayer;
@@ -34,15 +28,16 @@ export class TopBar {
             <span class="top-instruction-text">${instruction}</span>
           </div>
           <div class="top-actions">
-            <button class="top-btn top-btn-cancel" id="cancel-btn" title="Cancel">
-              <span class="material-icons">close</span>
-              <span class="cancel-label">Cancel</span>
-            </button>
+            <button class="top-btn" title="Fullscreen" id="fullscreen-btn"><span class="material-icons">fullscreen</span></button>
           </div>
         </div>
       `;
-      this.container.querySelector('#cancel-btn')?.addEventListener('click', () => {
-        if (this.onCancel) this.onCancel();
+      this.container.querySelector('#fullscreen-btn')?.addEventListener('click', () => {
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen();
+        } else {
+          document.exitFullscreen();
+        }
       });
     } else {
       this.container.innerHTML = `
