@@ -312,14 +312,31 @@
             background: rgba(239, 83, 80, 0.15);
             color: var(--error); font-size: 10px; font-weight: 600;
         }
-        .action-info-popup {
-            display: none; position: absolute; top: 100%; left: 0; z-index: 20;
-            margin-top: 4px; padding: var(--spacing-sm);
-            background: var(--bg-dark); border: 1px solid var(--surface-border);
-            border-radius: var(--radius-md); box-shadow: var(--shadow-lg);
-            gap: 4px; flex-wrap: wrap; min-width: 200px;
+        #char-card-overlay {
+            position: fixed; inset: 0; z-index: 10000;
+            display: flex; align-items: center; justify-content: center;
         }
-        .action-info-popup.open { display: flex; }
+        .char-card-backdrop {
+            position: absolute; inset: 0;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
+        .char-card-content {
+            position: relative; max-width: 61vw; max-height: 90vh;
+        }
+        .char-card-content img {
+            max-width: 100%; max-height: 100%; object-fit: contain;
+            border-radius: var(--radius-lg);
+            box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+        }
+        .char-card-close {
+            position: absolute; top: 12px; right: 12px;
+            background: rgba(0,0,0,0.6); border: none; color: white;
+            width: 36px; height: 36px; border-radius: 50%;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+        }
+        .char-card-close:hover { background: rgba(0,0,0,0.8); }
         .action-marker {
             padding: 3px 8px; border-radius: 4px;
             font-size: var(--font-size-xs);

@@ -36,6 +36,12 @@ const AVATAR_IMAGES: Record<ElementalType, string> = {
   fire: 'assets/characters/elementals_illustration (fire).png',
 };
 
+const CARD_IMAGES: Record<ElementalType, string> = {
+  earth: 'assets/kaijom.png',
+  water: 'assets/nitsuji.png',
+  fire: 'assets/krakatoa.png',
+};
+
 export class PlayerPanel {
   constructor(private container: HTMLElement) {}
 
@@ -78,32 +84,34 @@ export class PlayerPanel {
                 <span class="material-icons">info_outline</span>
                 Actions${player.actionMarker ? ' <span class="cooldown-badge">1 on cooldown</span>' : ''}
               </button>
-              <div class="action-info-popup" id="popup-${type}">
-                ${actions.map(a => `
-                  <div class="action-marker ${a.id === player.actionMarker ? 'blocked' : ''}">${a.name}</div>
-                `).join('')}
-              </div>
             </div>
           </div>
         </div>
       `;
     }).join('');
 
-    // Toggle action info popups
+    // Show full-page character card overlay
     this.container.querySelectorAll('.action-info-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
-        const playerType = btn.getAttribute('data-player');
-        const popup = this.container.querySelector(`#popup-${playerType}`) as HTMLElement;
-        if (popup) {
-          const isOpen = popup.classList.toggle('open');
-          // Close others
-          if (isOpen) {
-            this.container.querySelectorAll('.action-info-popup.open').forEach(p => {
-              if (p !== popup) p.classList.remove('open');
-            });
-          }
-        }
+        const playerType = btn.getAttribute('data-player') as ElementalType;
+        const existing = document.getElementById('char-card-overlay');
+        if (existing) { existing.remove(); return; }
+
+        const overlay = document.createElement('div');
+        overlay.id = 'char-card-overlay';
+        overlay.innerHTML = `
+          <div class="char-card-backdrop"></div>
+          <div class="char-card-content">
+            <img src="${CARD_IMAGES[playerType]}" alt="${ELEMENTAL_NAMES[playerType]}">
+            <button class="char-card-close"><span class="material-icons">close</span></button>
+          </div>
+        `;
+        document.body.appendChild(overlay);
+
+        const close = () => overlay.remove();
+        overlay.querySelector('.char-card-backdrop')!.addEventListener('click', close);
+        overlay.querySelector('.char-card-close')!.addEventListener('click', close);
       });
     });
   }
