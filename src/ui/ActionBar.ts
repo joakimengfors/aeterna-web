@@ -49,6 +49,15 @@ const ACTION_HTML: Record<string, string> = {
   'firewall': 'Place 3 <img class="token-inline" src="assets/tokens/fire-token.png"> in a line from <img class="meeple-inline" src="assets/meeples/fire-elemental.png">.',
 };
 
+// Ability icon sprites: { image, backgroundPosition }
+// Earth sprite is 2x2 grid: TL=Uproot, TR=Raise Mountain, BL=Landslide, BR=Sprout
+const ABILITY_ICONS: Record<string, { image: string; pos: string }> = {
+  'uproot':          { image: 'assets/abilities/earth-abilities.png', pos: '0% 0%' },
+  'raise-mountain':  { image: 'assets/abilities/earth-abilities.png', pos: '100% 0%' },
+  'landslide':       { image: 'assets/abilities/earth-abilities.png', pos: '0% 100%' },
+  'sprout':          { image: 'assets/abilities/earth-abilities.png', pos: '100% 100%' },
+};
+
 export class ActionBar {
   private onActionClick: ((actionId: ActionId) => void) | null = null;
   private onSOTClick: (() => void) | null = null;
@@ -163,11 +172,16 @@ export class ActionBar {
         <div class="actions-grid">
           ${actions.map(a => `
             <div class="action-card${a.id === player.actionMarker ? ' blocked' : ''}${a.id === 'special' ? ' special' : ''}" data-action="${a.id}">
-              <div class="action-card-header"><h4>${a.name}</h4></div>
-              <div class="action-card-body">
-                ${a.id === 'special' && specialCard
-                  ? specialCard.name
-                  : ACTION_HTML[a.id] || a.description}
+              ${ABILITY_ICONS[a.id] ? `<div class="ability-icon" style="background-image: url('${ABILITY_ICONS[a.id].image}'); background-position: ${ABILITY_ICONS[a.id].pos};"></div>` : ''}
+              <div class="action-card-content">
+                <div class="action-card-header">
+                  <h4>${a.name}</h4>
+                </div>
+                <div class="action-card-body">
+                  ${a.id === 'special' && specialCard
+                    ? specialCard.name
+                    : ACTION_HTML[a.id] || a.description}
+                </div>
               </div>
             </div>
           `).join('')}
