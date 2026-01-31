@@ -69,7 +69,7 @@ export class HexInteraction {
 
     this.board.setHexClickHandler((hexId) => this.onHexClick(hexId));
     this.topBar.setOnCancel(() => this.onUndo());
-    this.renderAll();
+    this.showTurnBanner(() => this.renderAll());
   }
 
   private renderAll() {
@@ -873,13 +873,13 @@ export class HexInteraction {
             this.startFogMovePhase(1, () => {
               this.turnMgr.endTurn();
               this.executor = new ActionExecutor(this.state);
-              this.renderAll();
+              this.showTurnBanner(() => this.renderAll());
             });
           }},
           { text: 'No', primary: false, callback: () => {
             this.turnMgr.endTurn();
             this.executor = new ActionExecutor(this.state);
-            this.renderAll();
+            this.showTurnBanner(() => this.renderAll());
           }},
         ]);
         return;
@@ -887,7 +887,7 @@ export class HexInteraction {
 
       this.turnMgr.endTurn();
       this.executor = new ActionExecutor(this.state);
-      this.renderAll();
+      this.showTurnBanner(() => this.renderAll());
       return;
     }
 
@@ -906,7 +906,23 @@ export class HexInteraction {
     this.waterHexBeforeMosey = null;
     this.turnMgr.endTurn();
     this.executor = new ActionExecutor(this.state);
-    this.renderAll();
+    this.showTurnBanner(() => this.renderAll());
+  }
+
+  private showTurnBanner(callback: () => void) {
+    const name = NAMES[this.state.currentPlayer];
+    // Apply theme immediately so banner picks up correct colors
+    const layout = document.querySelector('.game-layout');
+    if (layout) layout.className = `game-layout theme-${this.state.currentPlayer}`;
+
+    const banner = document.createElement('div');
+    banner.className = 'turn-banner';
+    banner.innerHTML = `<div class="turn-banner-text">${name}'s Turn!</div>`;
+    document.body.appendChild(banner);
+
+    // Remove banner after animation; show UI immediately
+    setTimeout(() => banner.remove(), 1600);
+    callback();
   }
 
   private onUndo() {

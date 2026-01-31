@@ -1051,6 +1051,47 @@
             vertical-align: middle; margin: 0 2px;
         }
 
+        /* Turn banner flash */
+        .turn-banner {
+            position: fixed; inset: 0; z-index: 1;
+            display: flex; align-items: center; justify-content: center;
+            pointer-events: none;
+            animation: banner-lifecycle 1.6s ease forwards;
+        }
+        @keyframes banner-lifecycle {
+            0% { opacity: 0; }
+            15% { opacity: 1; }
+            70% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+        .turn-banner-text {
+            font-family: var(--font-display);
+            font-size: clamp(32px, 5vw, 56px);
+            font-weight: 800;
+            color: var(--el-primary);
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            text-shadow:
+                0 0 30px var(--el-glow),
+                0 0 60px var(--el-glow),
+                0 2px 4px rgba(0,0,0,0.8);
+            padding: var(--spacing-lg) var(--spacing-xl);
+            background: linear-gradient(180deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.5) 100%);
+            border-top: 2px solid var(--el-primary);
+            border-bottom: 2px solid var(--el-primary);
+            box-shadow: 0 0 40px rgba(0,0,0,0.6), 0 0 20px var(--el-glow);
+            width: 100%;
+            text-align: center;
+            animation: banner-scale 1.6s ease forwards;
+        }
+        @keyframes banner-scale {
+            0% { transform: scale(0.7); }
+            15% { transform: scale(1.05); }
+            25% { transform: scale(1); }
+            70% { transform: scale(1); }
+            100% { transform: scale(1.1); }
+        }
+
         /* Corner frames */
         .corner-frame {
             position: absolute; width: 40px; height: 40px;
