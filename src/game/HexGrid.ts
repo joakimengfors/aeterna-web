@@ -85,11 +85,6 @@ const HEX_AXIAL: Record<HexId, HexCoord> = {
   41: { q: -3, r: 4 },
 };
 
-// Shore hexes: outer ring of the board
-const SHORE_HEXES: Set<HexId> = new Set([
-  1, 2, 5, 6, 12, 13, 18, 19, 25, 26, 31, 32, 36, 37, 40, 41
-]);
-
 // All valid hex IDs
 export const ALL_HEX_IDS: HexId[] = Array.from({ length: 41 }, (_, i) => (i + 1) as HexId);
 
@@ -119,6 +114,11 @@ for (const [idStr, coord] of Object.entries(HEX_AXIAL)) {
   }
   ADJACENCY.set(id, neighbors);
 }
+
+// Shore hexes: outer ring (fewer than 6 neighbors)
+const SHORE_HEXES: Set<HexId> = new Set(
+  ALL_HEX_IDS.filter(id => (ADJACENCY.get(id) ?? []).length < 6)
+);
 
 export function getNeighbors(hexId: HexId): HexId[] {
   return ADJACENCY.get(hexId) ?? [];

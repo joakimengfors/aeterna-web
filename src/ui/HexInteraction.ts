@@ -532,6 +532,7 @@ export class HexInteraction {
         // Step 0 was move — apply movement
         const earth = this.state.getPlayer('earth');
         if (hexId !== earth.hexId) {
+          this.executor.handleEarthConversion(hexId);
           this.state.setElementalOnHex(hexId, 'earth');
         }
         // Step 1: place mountain
@@ -551,6 +552,7 @@ export class HexInteraction {
         // Step 1 was move — apply movement
         const earth = this.state.getPlayer('earth');
         if (hexId !== earth.hexId) {
+          this.executor.handleEarthConversion(hexId);
           this.state.setElementalOnHex(hexId, 'earth');
         }
       } else {
@@ -573,6 +575,7 @@ export class HexInteraction {
 
       const earth = this.state.getPlayer('earth');
       if (hexId !== earth.hexId) {
+        this.executor.handleEarthConversion(hexId);
         this.state.setElementalOnHex(hexId, 'earth');
       }
 

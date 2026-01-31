@@ -812,7 +812,7 @@ export class ActionExecutor {
   }
 
   /** Earth landing on Lake -> convert to Forest */
-  private handleEarthConversion(hexId: HexId) {
+  handleEarthConversion(hexId: HexId) {
     if (this.state.hasToken(hexId, 'lake')) {
       this.state.destroyToken(hexId, 'lake');
       if (this.state.takeFromSupply('earth', 'forest')) {
