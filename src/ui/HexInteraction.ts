@@ -89,9 +89,9 @@ export class HexInteraction {
       btn.classList.toggle('active', btn.getAttribute('data-el') === this.state.currentPlayer);
     });
 
-    // Show SOT dialog automatically when entering START_OF_TURN
+    // Auto-start SOT ability when entering START_OF_TURN
     if (this.state.phase === 'START_OF_TURN') {
-      this.dialog.showSOT(this.state.currentPlayer, () => this.onSOTStart(), () => this.onSOTSkip());
+      this.onSOTStart();
     }
     // Show action choice dialog when entering CHOOSE_ACTION
     else if (this.state.phase === 'CHOOSE_ACTION') {
@@ -145,9 +145,18 @@ export class HexInteraction {
     this.state.phase = 'EXECUTING';
     this.state.pendingAction = null;
     this.state.stepInstruction = this.getSOTInstruction();
+
+    // Show targets and non-blocking SOT dialog (hex clicks pass through)
     this.board.render(this.state);
     this.board.highlightValidTargets(targets, this.state.currentPlayer);
     this.topBar.render(this.state);
+
+    this.dialog.showSOT(this.state.currentPlayer, () => {
+      // OK — just dismiss, targets already active
+    }, () => {
+      // Skip SOT
+      this.onSOTSkip();
+    });
   }
 
   private getSOTInstruction(): string {
@@ -416,7 +425,8 @@ export class HexInteraction {
     }
 
     if (this.state.phase === 'EXECUTING' && !this.selectedAction) {
-      // SOT execution — show confirm dialog
+      // SOT execution — hide SOT info, show confirm dialog
+      this.dialog.hide();
       this.actionTargets = [hexId];
       this.board.highlightSelected(hexId);
       this.state.phase = 'CONFIRM';
@@ -928,6 +938,8 @@ export class HexInteraction {
   private onUndo() {
     this.dialog.hide();
 
+    const wasSOT = !this.selectedAction && this.state.phase === 'EXECUTING';
+
     if (this.savedState) {
       Object.assign(this.state, this.savedState);
       this.state.board = this.savedState.board;
@@ -949,7 +961,11 @@ export class HexInteraction {
     this.postFogCallback = null;
     this.postForcedMoveCallback = null;
 
-    if (this.state.sotUsed) {
+    if (wasSOT) {
+      // Cancel during SOT = skip SOT
+      this.state.phase = 'CHOOSE_ACTION';
+      this.state.sotUsed = false;
+    } else if (this.state.sotUsed) {
       this.state.phase = 'CHOOSE_ACTION';
     } else {
       this.state.phase = 'START_OF_TURN';

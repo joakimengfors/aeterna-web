@@ -62,7 +62,7 @@ export class GameDialog {
     });
   }
 
-  showSOT(elementalType: ElementalType, onUse: () => void, onSkip: () => void) {
+  showSOT(elementalType: ElementalType, onDismiss: () => void, onSkip: () => void) {
     this.cancelCallback = null;
     this.content.innerHTML = `
       <div class="dialog-header">
@@ -73,17 +73,20 @@ export class GameDialog {
       </div>
       <div class="dialog-actions">
         <button class="dialog-btn dialog-btn-secondary" data-idx="skip">Skip</button>
-        <button class="dialog-btn dialog-btn-primary" data-idx="use">Use Ability</button>
+        <button class="dialog-btn dialog-btn-primary" data-idx="ok">OK</button>
       </div>
     `;
-    this.content.querySelector('[data-idx="use"]')!.addEventListener('click', () => {
+    this.content.querySelector('[data-idx="ok"]')!.addEventListener('click', () => {
       this.hide();
-      onUse();
+      onDismiss();
     });
     this.content.querySelector('[data-idx="skip"]')!.addEventListener('click', () => {
       this.hide();
       onSkip();
     });
+    // Non-blocking: let clicks pass through overlay to hexes beneath
+    this.overlay.style.pointerEvents = 'none';
+    this.content.style.pointerEvents = 'auto';
     this.show();
   }
 
@@ -212,6 +215,8 @@ export class GameDialog {
   hide() {
     this.overlay.classList.remove('dialog-visible');
     this.overlay.style.display = 'none';
+    this.overlay.style.pointerEvents = '';
+    this.content.style.pointerEvents = '';
     this.cancelCallback = null;
   }
 }
