@@ -22,6 +22,8 @@ export class GameState {
   pendingSteps: any[] = []; // action-specific pending data
   stepInstruction = ''; // instruction text shown during EXECUTING phase
   sotUsed = false; // start-of-turn ability used this turn
+  pendingForcedMove: { player: ElementalType; validTargets: HexId[] } | null = null;
+  pendingFogMove = false; // true when Water moved (not teleported) and fogs need moving
 
   constructor() {
     this.specialDeck = new SpecialAbilityDeck();
@@ -189,6 +191,8 @@ export class GameState {
     this.pendingAction = null;
     this.pendingSteps = [];
     this.sotUsed = false;
+    this.pendingForcedMove = null;
+    this.pendingFogMove = false;
   }
 
   addLog(description: string) {
@@ -230,6 +234,8 @@ export class GameState {
     gs.pendingAction = this.pendingAction;
     gs.pendingSteps = [...this.pendingSteps];
     gs.sotUsed = this.sotUsed;
+    gs.pendingForcedMove = this.pendingForcedMove ? { ...this.pendingForcedMove, validTargets: [...this.pendingForcedMove.validTargets] } : null;
+    gs.pendingFogMove = this.pendingFogMove;
     return gs;
   }
 }

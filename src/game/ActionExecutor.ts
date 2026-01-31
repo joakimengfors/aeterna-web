@@ -131,9 +131,10 @@ export class ActionExecutor {
 
     this.state.setElementalOnHex(targetHex, 'water');
 
-    // If it was a 1-hex move (not teleport), move Fog tokens
+    // Fog movement handled interactively by UI (only for 1-hex moves, not teleports)
+    // Store whether this was a move (not teleport) so UI can trigger fog movement
     if (isMove) {
-      this.moveFogTokens(1);
+      this.state.pendingFogMove = true;
     }
 
     this.state.addLog(`Water start-of-turn: moved to hex ${targetHex}.`);
@@ -212,7 +213,7 @@ export class ActionExecutor {
       earth.hexId, range,
       (h) => this.canEarthEnter(h),
       (h) => this.canEarthPassThrough(h),
-    )];
+    )].filter(h => this.canEarthEnd(h));
   }
 
   private executeUproot(targetHex: HexId): string {
@@ -237,7 +238,7 @@ export class ActionExecutor {
     // Move up to 1 hex
     const targets: HexId[] = [earth.hexId]; // Can stay
     for (const n of getNeighbors(earth.hexId)) {
-      if (this.canEarthEnter(n)) targets.push(n);
+      if (this.canEarthEnd(n)) targets.push(n);
     }
     return targets;
   }
@@ -292,11 +293,11 @@ export class ActionExecutor {
     const earth = this.state.getPlayer('earth');
     const range = this.state.countTokensOnBoard('mountain');
     if (range === 0) return [earth.hexId];
-    return [earth.hexId, ...getReachableHexes(
+    return [earth.hexId, ...[...getReachableHexes(
       earth.hexId, range,
       (h) => this.canEarthEnter(h),
       (h) => this.canEarthPassThrough(h),
-    )];
+    )].filter(h => this.canEarthEnd(h))];
   }
 
   /** After Landslide move, get mountains that can be destroyed */
@@ -405,7 +406,7 @@ export class ActionExecutor {
 
     this.handleWaterConversion(targetHex);
     this.state.setElementalOnHex(targetHex, 'water');
-    this.moveFogTokens(1);
+    // Fog movement handled interactively by UI
 
     return `Mosey — moved from hex ${oldHex} to hex ${targetHex}`;
   }
@@ -528,7 +529,7 @@ export class ActionExecutor {
     return `Smoke Dash — moved from hex ${oldHex} to hex ${targetHex}`;
   }
 
-  private getFlameDashTargets(): HexId[] {
+  getFlameDashTargets(): HexId[] {
     const fire = this.state.getPlayer('fire');
     const bonus = this.getFireMovementBonus();
     const range = 3 + bonus;
@@ -548,21 +549,31 @@ export class ActionExecutor {
     return [...new Set(targets)];
   }
 
-  private executeFlameDash(targetHex: HexId): string {
+  /** Get Fire's own hex as a target for placing fire before moving */
+  canFlameDashPlaceFirst(): boolean {
+    const fire = this.state.getPlayer('fire');
+    return !this.state.hasToken(fire.hexId, 'fire') && (fire.supplies.fire ?? 0) > 0;
+  }
+
+  /** Execute Flame Dash move (fire placement handled by UI) */
+  executeFlameDashMove(targetHex: HexId, placeFireOnDest: boolean): string {
     const fire = this.state.getPlayer('fire');
     const oldHex = fire.hexId;
 
     this.handleFireConversion(targetHex);
     this.state.setElementalOnHex(targetHex, 'fire');
 
-    // Place fire on destination
-    if (!this.state.hasToken(targetHex, 'fire')) {
+    if (placeFireOnDest && !this.state.hasToken(targetHex, 'fire')) {
       if (this.state.takeFromSupply('fire', 'fire')) {
         this.state.addToken(targetHex, 'fire');
       }
     }
 
-    return `Flame Dash — moved to hex ${targetHex}, placed Fire`;
+    return `Flame Dash — moved to hex ${targetHex}${placeFireOnDest ? ', placed Fire' : ''}`;
+  }
+
+  private executeFlameDash(targetHex: HexId): string {
+    return this.executeFlameDashMove(targetHex, true);
   }
 
   private getFirestormPlacementTargets(): HexId[] {
@@ -585,10 +596,6 @@ export class ActionExecutor {
         }
       }
     }
-
-    // Also Earth's hex
-    const earthHex = this.state.getPlayer('earth').hexId;
-    targets.push(earthHex);
 
     return [...new Set(targets)];
   }
@@ -747,17 +754,27 @@ export class ActionExecutor {
   private canEarthEnter(hexId: HexId): boolean {
     const hex = this.state.getHex(hexId);
     if (hex.tokens.includes('fire')) return false;
-    if (hex.tokens.includes('mountain')) return false;
-    if (hex.stoneMinion) return false;
+    // Mountains and stone minion can be entered (passed through) but not ended on
     return true;
   }
 
   private canEarthPassThrough(hexId: HexId): boolean {
     const hex = this.state.getHex(hexId);
     if (hex.tokens.includes('fire')) return false;
-    // Can pass through mountains but not end on them - handled by canEnter
+    // Can pass through mountains and stone minion but can't continue past them
+    if (hex.tokens.includes('mountain')) return false;
+    if (hex.stoneMinion) return false;
     // Fog stops movement
     if (hex.tokens.includes('fog') && !hex.elemental) return false;
+    return true;
+  }
+
+  /** Check if Earth can END on a hex (not mountains, not stone minion, not fire) */
+  private canEarthEnd(hexId: HexId): boolean {
+    const hex = this.state.getHex(hexId);
+    if (hex.tokens.includes('fire')) return false;
+    if (hex.tokens.includes('mountain')) return false;
+    if (hex.stoneMinion) return false;
     return true;
   }
 
@@ -797,6 +814,14 @@ export class ActionExecutor {
       this.state.destroyToken(hexId, 'fire');
       if (this.state.takeFromSupply('water', 'lake')) {
         this.state.addToken(hexId, 'lake');
+
+        // Auto-deploy fog when last lake is placed
+        const water = this.state.getPlayer('water');
+        if ((water.supplies.lake ?? 0) === 0 && (water.supplies.fog ?? 0) > 0) {
+          if (this.state.takeFromSupply('water', 'fog')) {
+            this.state.addToken(hexId, 'fog');
+          }
+        }
       }
     }
   }
@@ -812,31 +837,63 @@ export class ActionExecutor {
   }
 
   /** When Fire places fire on Earth's hex, Earth must move 1 space */
-  private handleFireOnEarth() {
+  handleFireOnEarth() {
     const earth = this.state.getPlayer('earth');
     const neighbors = getNeighbors(earth.hexId);
-    const validMoves = neighbors.filter(n => this.canEarthEnter(n));
+    const validMoves = neighbors.filter(n => this.canEarthEnd(n));
 
     if (validMoves.length === 0) {
       // Earth is trapped! Fire wins!
       this.state.winner = 'fire';
       this.state.addLog('Earth is trapped! Fire wins!');
-    }
-    // In a real game, Earth player would choose. For MVP, auto-move to first valid.
-    // TODO: Make this interactive
-    else {
-      const dest = validMoves[0];
-      this.handleEarthConversion(dest);
-      this.state.setElementalOnHex(dest, 'earth');
-      this.state.addLog(`Earth forced to move to hex ${dest}.`);
+    } else {
+      // Set pending forced move for UI to handle interactively
+      this.state.pendingForcedMove = { player: 'earth', validTargets: validMoves };
     }
   }
 
-  /** Move all fog tokens up to `distance` hexes */
-  private moveFogTokens(_distance: number) {
-    // In MVP, fog movement will be simplified.
-    // Full implementation would let Water player choose fog destinations.
-    // For now, fog stays in place unless we implement interactive fog movement.
+  /** Execute the forced move after Earth player chooses */
+  executeForcedMove(targetHex: HexId) {
+    this.handleEarthConversion(targetHex);
+    this.state.setElementalOnHex(targetHex, 'earth');
+    this.state.addLog(`Earth forced to move to hex ${targetHex}.`);
+    this.state.pendingForcedMove = null;
+  }
+
+  /** Get all hexes that have fog tokens */
+  getFogTokenHexes(): HexId[] {
+    const hexes: HexId[] = [];
+    for (const [id, hex] of this.state.board) {
+      if (hex.tokens.includes('fog')) hexes.push(id);
+    }
+    return hexes;
+  }
+
+  /** Get valid movement targets for a fog token */
+  getFogMoveTargets(fogHex: HexId, range: number): HexId[] {
+    const targets: HexId[] = [fogHex]; // Can stay in place (skip)
+    const visited = new Set<HexId>([fogHex]);
+    const queue: [HexId, number][] = [[fogHex, 0]];
+
+    while (queue.length > 0) {
+      const [current, dist] = queue.shift()!;
+      if (dist >= range) continue;
+      for (const n of getNeighbors(current)) {
+        if (visited.has(n)) continue;
+        visited.add(n);
+        targets.push(n);
+        queue.push([n, dist + 1]);
+      }
+    }
+    return targets;
+  }
+
+  /** Move a fog token from one hex to another */
+  moveFog(fromHex: HexId, toHex: HexId) {
+    if (fromHex === toHex) return; // Skip
+    this.state.removeToken(fromHex, 'fog');
+    this.state.addToken(toHex, 'fog');
+    this.state.addLog(`Fog moved from hex ${fromHex} to hex ${toHex}.`);
   }
 
   /** Check if current player can execute any action at all */

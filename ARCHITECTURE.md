@@ -57,7 +57,14 @@ User clicks hex
 START_OF_TURN → (Use Ability / Skip) → CHOOSE_ACTION → (Pick action) → EXECUTING → (Click hexes) → CONFIRM → (Confirm) → next player's START_OF_TURN
 ```
 
-Multi-step actions (Raise Mountain, Landslide, Conjure, Firestorm) stay in EXECUTING across multiple hex clicks, incrementing `currentStep`.
+Multi-step actions (Raise Mountain, Landslide, Conjure, Firestorm, Flame Dash) stay in EXECUTING across multiple hex clicks, incrementing `currentStep`.
+
+#### Sub-phases
+
+Some actions trigger interactive sub-phases that interrupt the normal flow:
+
+- **Fog Movement**: After Water moves (SOT or Mosey, not teleport), the player is prompted to move each fog token up to the same distance. Fog can move to any adjacent hex. Tracked via `pendingFogMoves` in HexInteraction.
+- **Earth Forced Move**: When Fire places a fire token on Earth's hex, Earth's player chooses where to move (1 adjacent hex). Tracked via `pendingForcedMove` in GameState.
 
 ### Undo System
 
@@ -87,10 +94,17 @@ Before any action begins, `GameState.clone()` saves a deep copy. On undo, `Objec
 - **Water**: Capture Fire OR Fire is trapped (no legal moves)
 - **Fire**: Capture Earth OR trap Earth OR 12 Fire tokens on board
 
+### Movement Rules
+
+- **Earth (Uproot/Landslide)**: Can pass through mountains and stone minion hexes but cannot end on them. Fire tokens and fog block movement entirely.
+- **Flame Dash**: Player may place fire on their current hex before moving OR on the destination hex after moving (not both).
+- **Fog Movement**: Whenever Water moves (not teleports), all fog tokens may be moved up to the same distance. Fog can move to any adjacent hex.
+- **Fog Auto-deploy**: When the last lake token is placed (via Conjure or fire→lake conversion), fog automatically deploys from supply onto the same hex.
+
 ### Token Conversions (on movement)
 
 - Earth enters Lake hex → Lake becomes Forest
-- Water enters Fire hex → Fire becomes Lake
+- Water enters Fire hex → Fire becomes Lake (+ fog auto-deploy if last lake)
 - Fire enters Forest hex → Forest becomes Fire
 
 ### Special Ability Cards (6 unique, 12 total)
@@ -127,20 +141,15 @@ Before any action begins, `GameState.clone()` saves a deep copy. On undo, `Objec
 
 ### Must Fix
 
-1. **Forced Earth movement is not interactive** (`ActionExecutor.ts:826`)
-   When Fire places fire on Earth's hex, Earth must move. Currently auto-selects the first valid hex instead of prompting the player to choose.
-
-2. **Raise Mountain "move existing mountain"** — When all 4 mountains are placed, the action should let you pick up an existing mountain and relocate it. The target selection flow for this needs refinement (currently implemented but the 2-target UX for source→destination isn't polished).
+1. **Raise Mountain "move existing mountain"** — When all 4 mountains are placed, the action should let you pick up an existing mountain and relocate it. The target selection flow for this needs refinement (currently implemented but the 2-target UX for source→destination isn't polished).
 
 ### Should Improve
 
-3. **Fog movement is simplified** — Water's fog interaction during movement doesn't interactively prompt for fog token destination. The rules say fog should stop movement and stay behind, but the current implementation is basic.
+2. **Re-Materialize action** — Swap between Nitsuji and a Fog token. Works but could use better visual feedback showing the swap preview.
 
-4. **Re-Materialize action** — Swap between Nitsuji and a Fog token. Works but could use better visual feedback showing the swap preview.
+3. **Firestorm multi-step** — The 3-step fire group expansion + movement flow works but the UX could be clearer about which step you're on (currently relies on stepInstruction text).
 
-5. **Firestorm multi-step** — The 3-step fire group expansion + movement flow works but the UX could be clearer about which step you're on (currently relies on stepInstruction text).
-
-6. **Action card descriptions** — The `ACTION_HTML` map in ActionBar.ts has rich descriptions with inline images, but some descriptions could be more precise about ranges and conditions.
+4. **Action card descriptions** — The `ACTION_HTML` map in ActionBar.ts has rich descriptions with inline images, but some descriptions could be more precise about ranges and conditions.
 
 ### Polish / Nice to Have
 

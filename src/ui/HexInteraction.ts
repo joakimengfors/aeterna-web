@@ -32,6 +32,17 @@ export class HexInteraction {
   private currentStep = 0; // for multi-step actions
   private validTargets: HexId[] = [];
 
+  // Fog movement sub-phase
+  private pendingFogMoves: HexId[] = [];
+  private fogMoveRange = 0;
+  private postFogCallback: (() => void) | null = null;
+
+  // Forced move sub-phase
+  private postForcedMoveCallback: (() => void) | null = null;
+
+  // Flame Dash state: tracks whether fire was placed before moving
+  private flameDashPlacedFirst = false;
+
   constructor(
     state: GameState,
     board: BoardRenderer,
@@ -128,6 +139,7 @@ export class HexInteraction {
     this.selectedAction = actionId;
     this.actionTargets = [];
     this.currentStep = 0;
+    this.flameDashPlacedFirst = false;
 
     // Handle Special Ability
     if (actionId === 'special') {
@@ -136,6 +148,15 @@ export class HexInteraction {
     }
 
     const targets = this.executor.getValidTargets(actionId);
+
+    // For Flame Dash, also include Fire's own hex if eligible
+    if (actionId === 'flame-dash' && this.executor.canFlameDashPlaceFirst()) {
+      const fire = this.state.getPlayer('fire');
+      if (!targets.includes(fire.hexId)) {
+        targets.unshift(fire.hexId);
+      }
+    }
+
     if (targets.length === 0) {
       // No valid targets - can't use this action
       this.selectedAction = null;
@@ -266,12 +287,32 @@ export class HexInteraction {
   private onHexClick(hexId: HexId) {
     if (!this.validTargets.includes(hexId)) return;
 
+    // Fog movement sub-phase
+    if (this.pendingFogMoves.length > 0) {
+      this.handleFogMoveClick(hexId);
+      return;
+    }
+
+    // Forced move sub-phase
+    if (this.state.pendingForcedMove) {
+      this.handleForcedMoveClick(hexId);
+      return;
+    }
+
     if (this.state.phase === 'EXECUTING' && !this.selectedAction) {
       // SOT execution
       this.executor.executeSOT(hexId);
-      this.state.phase = 'CHOOSE_ACTION';
       this.checkWin();
-      this.renderAll();
+
+      // Check for forced move (Fire SOT placed fire on Earth)
+      if (this.state.pendingForcedMove) {
+        this.startForcedMovePhase(() => {
+          this.finishSOT();
+        });
+        return;
+      }
+
+      this.finishSOT();
       return;
     }
 
@@ -291,17 +332,34 @@ export class HexInteraction {
       case 'firestorm':
         this.handleFirestormStep(hexId);
         return;
+      case 'flame-dash':
+        this.handleFlameDashStep(hexId);
+        return;
       case 'special':
         this.handleSpecialStep(hexId);
         return;
     }
 
-    // Single-step actions
+    // Single-step actions (mosey handled here too but needs fog follow-up)
     this.actionTargets = [hexId];
     this.board.highlightSelected(hexId);
     this.state.phase = 'CONFIRM';
     this.renderAll();
     this.board.highlightSelected(hexId);
+  }
+
+  /** After Water SOT completes, handle fog movement then advance to CHOOSE_ACTION */
+  private finishSOT() {
+    if (this.state.currentPlayer === 'water' && this.state.pendingFogMove) {
+      this.state.pendingFogMove = false;
+      this.startFogMovePhase(1, () => {
+        this.state.phase = 'CHOOSE_ACTION';
+        this.renderAll();
+      });
+      return;
+    }
+    this.state.phase = 'CHOOSE_ACTION';
+    this.renderAll();
   }
 
   private handleRaiseMountainStep(hexId: HexId) {
@@ -415,6 +473,40 @@ export class HexInteraction {
     }
   }
 
+  private handleFlameDashStep(hexId: HexId) {
+    const fire = this.state.getPlayer('fire');
+
+    if (this.currentStep === 0) {
+      if (hexId === fire.hexId && this.executor.canFlameDashPlaceFirst()) {
+        // Player chose to place fire on own hex first
+        this.flameDashPlacedFirst = true;
+        if (this.state.takeFromSupply('fire', 'fire')) {
+          this.state.addToken(fire.hexId, 'fire');
+        }
+        this.currentStep = 1;
+
+        // Now show movement targets (re-compute since board changed)
+        const moveTargets = this.executor.getFlameDashTargets();
+        this.validTargets = moveTargets;
+        this.state.stepInstruction = `Move Krakatoa in a straight line`;
+        this.renderAll();
+        this.board.highlightValidTargets(moveTargets, this.state.currentPlayer);
+      } else {
+        // Player chose a movement destination directly — place fire on destination after
+        this.actionTargets = [hexId];
+        this.state.phase = 'CONFIRM';
+        this.renderAll();
+        this.board.highlightSelected(hexId);
+      }
+    } else {
+      // Step 1: after placing fire first, now pick movement destination
+      this.actionTargets = [hexId];
+      this.state.phase = 'CONFIRM';
+      this.renderAll();
+      this.board.highlightSelected(hexId);
+    }
+  }
+
   private handleSpecialStep(hexId: HexId) {
     // Generic special handling - move to hex
     this.actionTargets.push(hexId);
@@ -434,11 +526,101 @@ export class HexInteraction {
   }
 
   // ==========================================
+  // FOG MOVEMENT SUB-PHASE
+  // ==========================================
+
+  private startFogMovePhase(range: number, callback: () => void) {
+    const fogHexes = this.executor.getFogTokenHexes();
+    if (fogHexes.length === 0) {
+      callback();
+      return;
+    }
+
+    this.pendingFogMoves = [...fogHexes];
+    this.fogMoveRange = range;
+    this.postFogCallback = callback;
+    this.promptNextFogMove();
+  }
+
+  private promptNextFogMove() {
+    if (this.pendingFogMoves.length === 0) {
+      const cb = this.postFogCallback;
+      this.postFogCallback = null;
+      this.fogMoveRange = 0;
+      if (cb) cb();
+      return;
+    }
+
+    const fogHex = this.pendingFogMoves[0];
+    const targets = this.executor.getFogMoveTargets(fogHex, this.fogMoveRange);
+    this.validTargets = targets;
+    this.state.stepInstruction = `Move Fog from hex ${fogHex} (click it to skip)`;
+    this.state.phase = 'EXECUTING';
+    this.renderAll();
+    this.board.highlightValidTargets(targets, 'water');
+  }
+
+  private handleFogMoveClick(hexId: HexId) {
+    const fogHex = this.pendingFogMoves.shift()!;
+    this.executor.moveFog(fogHex, hexId);
+    this.checkWin();
+    this.promptNextFogMove();
+  }
+
+  // ==========================================
+  // FORCED MOVE SUB-PHASE
+  // ==========================================
+
+  private startForcedMovePhase(callback: () => void) {
+    const fm = this.state.pendingForcedMove;
+    if (!fm) {
+      callback();
+      return;
+    }
+
+    this.postForcedMoveCallback = callback;
+    this.validTargets = fm.validTargets;
+    this.state.stepInstruction = `Earth must move! Choose a hex for Kaijom.`;
+    this.state.phase = 'EXECUTING';
+    this.renderAll();
+    this.board.highlightValidTargets(fm.validTargets, 'earth');
+  }
+
+  private handleForcedMoveClick(hexId: HexId) {
+    this.executor.executeForcedMove(hexId);
+    this.checkWin();
+    const cb = this.postForcedMoveCallback;
+    this.postForcedMoveCallback = null;
+    if (cb) cb();
+  }
+
+  // ==========================================
   // CONFIRM / UNDO
   // ==========================================
 
   private onConfirm() {
     if (this.state.phase === 'CONFIRM' && this.selectedAction) {
+      // Flame Dash special handling
+      if (this.selectedAction === 'flame-dash') {
+        const targetHex = this.actionTargets[0];
+        const placeOnDest = !this.flameDashPlacedFirst;
+        const result = this.executor.executeFlameDashMove(targetHex, placeOnDest);
+        this.state.addLog(result);
+        this.turnMgr.setActionMarker(this.selectedAction);
+        this.checkWin();
+
+        // Check for forced move (fire placed on Earth's hex)
+        if (this.state.pendingForcedMove) {
+          this.startForcedMovePhase(() => {
+            this.finishTurn();
+          });
+          return;
+        }
+
+        this.finishTurn();
+        return;
+      }
+
       // Execute the action
       const result = this.executor.executeAction(this.selectedAction, this.actionTargets);
       this.state.addLog(result);
@@ -446,20 +628,67 @@ export class HexInteraction {
 
       this.checkWin();
 
-      // End turn
+      // Check for forced move (Firestorm placed fire on Earth)
+      if (this.state.pendingForcedMove) {
+        this.startForcedMovePhase(() => {
+          // After forced move, check if Mosey needs fog movement
+          this.finishActionWithFogCheck();
+        });
+        return;
+      }
+
+      this.finishActionWithFogCheck();
+    } else if (this.state.phase === 'EXECUTING' && this.selectedAction === 'landslide' && this.currentStep === 1) {
+      // Landslide: confirm without destroying a mountain (skip optional step)
+      this.state.phase = 'CONFIRM';
+      this.onConfirm();
+    } else if (this.state.phase === 'EXECUTING' && this.selectedAction === 'firestorm' && this.currentStep === 0) {
+      // Firestorm: confirm placement phase early (less than 3), move to movement step
+      this.currentStep = 1;
+      const moveTargets = this.executor.getFirestormMoveTargets();
+      this.validTargets = moveTargets;
+      this.state.stepInstruction = `Move Krakatoa through connected fire`;
+      this.board.render(this.state);
+      this.board.highlightValidTargets(moveTargets, this.state.currentPlayer);
+    }
+  }
+
+  /** After action execution, check if Mosey needs fog movement, then end turn */
+  private finishActionWithFogCheck() {
+    const wasMosey = this.selectedAction === 'mosey';
+    const water = this.state.getPlayer('water');
+    const didMove = wasMosey && this.actionTargets[0] !== water.hexId;
+
+    if (wasMosey && didMove) {
+      // Need to reset action state before fog phase
+      const savedAction = this.selectedAction;
       this.selectedAction = null;
       this.actionTargets = [];
       this.currentStep = 0;
       this.savedState = null;
       this.state.stepInstruction = '';
-      this.turnMgr.endTurn();
-      this.executor = new ActionExecutor(this.state);
-      this.renderAll();
-    } else if (this.state.phase === 'EXECUTING' && this.selectedAction === 'landslide' && this.currentStep === 1) {
-      // Landslide: confirm without destroying a mountain (skip optional step)
-      this.state.phase = 'CONFIRM';
-      this.onConfirm();
+
+      this.startFogMovePhase(1, () => {
+        this.turnMgr.endTurn();
+        this.executor = new ActionExecutor(this.state);
+        this.renderAll();
+      });
+      return;
     }
+
+    this.finishTurn();
+  }
+
+  private finishTurn() {
+    this.selectedAction = null;
+    this.actionTargets = [];
+    this.currentStep = 0;
+    this.savedState = null;
+    this.state.stepInstruction = '';
+    this.flameDashPlacedFirst = false;
+    this.turnMgr.endTurn();
+    this.executor = new ActionExecutor(this.state);
+    this.renderAll();
   }
 
   private onUndo() {
@@ -475,6 +704,11 @@ export class HexInteraction {
     this.actionTargets = [];
     this.currentStep = 0;
     this.validTargets = [];
+    this.flameDashPlacedFirst = false;
+    this.pendingFogMoves = [];
+    this.fogMoveRange = 0;
+    this.postFogCallback = null;
+    this.postForcedMoveCallback = null;
 
     if (this.state.sotUsed) {
       this.state.phase = 'CHOOSE_ACTION';
@@ -501,7 +735,7 @@ export class HexInteraction {
       case 'firestorm':
         return step === 0 ? 'Choose a fire group to expand' : `Move ${name} through connected fire`;
       case 'flame-dash':
-        return `Move ${name} in a straight line (up to 3)`;
+        return step === 0 ? `Move ${name} in a line, or click your hex to place Fire first` : `Move ${name} in a straight line`;
       case 'smoke-dash':
         return `Move ${name} in a straight line (up to 2)`;
       case 'firewall':
