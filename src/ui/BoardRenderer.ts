@@ -50,10 +50,10 @@ export class BoardRenderer {
             <filter id="glow-water"><feGaussianBlur stdDeviation="4" result="b"/><feComposite in="SourceGraphic" in2="b" operator="over"/></filter>
             <filter id="glow-fire"><feGaussianBlur stdDeviation="4" result="b"/><feComposite in="SourceGraphic" in2="b" operator="over"/></filter>
             <clipPath id="clip-standee"><circle cx="0" cy="0" r="20"/></clipPath>
-            <clipPath id="clip-token-lg"><circle cx="0" cy="0" r="16"/></clipPath>
-            <clipPath id="clip-token-md"><circle cx="0" cy="0" r="14"/></clipPath>
-            <clipPath id="clip-token-sm"><circle cx="0" cy="0" r="10"/></clipPath>
-            <clipPath id="clip-token-mountain"><circle cx="0" cy="0" r="18"/></clipPath>
+            <clipPath id="clip-token-lg"><circle cx="0" cy="0" r="28.8"/></clipPath>
+            <clipPath id="clip-token-md"><circle cx="0" cy="0" r="25.2"/></clipPath>
+            <clipPath id="clip-token-sm"><circle cx="0" cy="0" r="18"/></clipPath>
+            <clipPath id="clip-token-mountain"><circle cx="0" cy="0" r="32.4"/></clipPath>
           </defs>
           <g id="hex-layer"></g>
           <g id="highlight-layer"></g>
@@ -122,24 +122,24 @@ export class BoardRenderer {
         img.classList.add('hex-token');
 
         if (token === 'fog') {
-          img.setAttribute('x', '-10');
-          img.setAttribute('y', '-10');
-          img.setAttribute('width', '20');
-          img.setAttribute('height', '20');
+          img.setAttribute('x', '-18');
+          img.setAttribute('y', '-18');
+          img.setAttribute('width', '36');
+          img.setAttribute('height', '36');
           // Offset fog slightly if stacked with lake
-          const offsetX = hex.tokens.includes('lake') ? 16 : 0;
-          const offsetY = hex.tokens.includes('lake') ? 14 : 0;
+          const offsetX = hex.tokens.includes('lake') ? 28.8 : 0;
+          const offsetY = hex.tokens.includes('lake') ? 25.2 : 0;
           img.setAttribute('transform', `translate(${pos.x + offsetX},${pos.y + offsetY})`);
           img.setAttribute('clip-path', 'url(#clip-token-sm)');
           img.style.opacity = '0.7';
         } else if (token === 'mountain') {
-          img.setAttribute('x', '-20');
-          img.setAttribute('y', '-16');
-          img.setAttribute('width', '40');
-          img.setAttribute('height', '32');
+          img.setAttribute('x', '-36');
+          img.setAttribute('y', '-28.8');
+          img.setAttribute('width', '72');
+          img.setAttribute('height', '57.6');
           img.setAttribute('transform', `translate(${pos.x},${pos.y})`);
         } else {
-          const size = token === 'fire' ? 28 : 32;
+          const size = token === 'fire' ? 50.4 : 57.6;
           const half = size / 2;
           img.setAttribute('x', String(-half));
           img.setAttribute('y', String(-half));
