@@ -761,9 +761,7 @@ export class ActionExecutor {
   private canEarthPassThrough(hexId: HexId): boolean {
     const hex = this.state.getHex(hexId);
     if (hex.tokens.includes('fire')) return false;
-    // Can pass through mountains and stone minion but can't continue past them
-    if (hex.tokens.includes('mountain')) return false;
-    if (hex.stoneMinion) return false;
+    // Can pass through mountains and stone minion (but can't end on them)
     // Fog stops movement
     if (hex.tokens.includes('fog') && !hex.elemental) return false;
     return true;

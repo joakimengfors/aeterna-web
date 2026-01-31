@@ -13,7 +13,7 @@
         .game-layout {
             display: grid;
             grid-template-columns: 320px 1fr;
-            grid-template-rows: auto 1fr auto;
+            grid-template-rows: auto 1fr;
             height: 100vh;
             width: 100vw;
             gap: 0;
@@ -261,7 +261,7 @@
             box-shadow: 0 0 16px var(--el-glow), inset 0 0 8px var(--el-glow);
         }
 
-        #bottom-panel { grid-column: 1 / -1; }
+        /* bottom panel removed */
 
         /* Player cards */
         .player-card {
@@ -370,6 +370,93 @@
             cursor: pointer; display: flex; align-items: center; justify-content: center;
         }
         .char-card-close:hover { background: rgba(0,0,0,0.8); }
+
+        /* Game dialog modal */
+        .dialog-overlay {
+            position: fixed; inset: 0; z-index: 5000;
+            display: flex; align-items: center; justify-content: flex-end; padding-right: 40px;
+            opacity: 0; transition: opacity 0.2s ease;
+            pointer-events: none;
+        }
+        .dialog-overlay.dialog-visible {
+            opacity: 1; pointer-events: all;
+        }
+        .dialog-backdrop {
+            position: absolute; inset: 0;
+            background: transparent;
+        }
+        .dialog-content {
+            position: relative;
+            min-width: 340px; max-width: 480px;
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--el-border);
+            background: var(--surface);
+            box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6), 0 0 20px var(--el-glow);
+            transform: scale(0.95);
+            transition: transform 0.25s ease;
+            overflow: hidden;
+        }
+        .dialog-visible .dialog-content {
+            transform: scale(1);
+        }
+        .dialog-header {
+            padding: var(--spacing-md) var(--spacing-lg);
+            background: var(--el-bg);
+            border-bottom: 1px solid var(--surface-border);
+        }
+        .dialog-title {
+            font-family: var(--font-display);
+            font-size: var(--font-size-lg);
+            color: var(--el-primary);
+            font-weight: 700;
+            text-align: center;
+            letter-spacing: 1px;
+        }
+        .dialog-body {
+            padding: var(--spacing-lg);
+        }
+        .dialog-message {
+            font-size: var(--font-size-base);
+            color: var(--text-secondary);
+            text-align: center;
+            line-height: 1.6;
+        }
+        .dialog-actions {
+            display: flex; gap: var(--spacing-md);
+            padding: var(--spacing-md) var(--spacing-lg) var(--spacing-lg);
+            justify-content: center;
+        }
+        .dialog-btn {
+            padding: var(--spacing-sm) var(--spacing-xl);
+            border-radius: var(--radius-md);
+            font-family: var(--font-display);
+            font-size: var(--font-size-sm);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            min-width: 120px;
+        }
+        .dialog-btn-primary {
+            border: none;
+            background: var(--el-gradient);
+            color: white;
+            box-shadow: 0 4px 16px var(--el-glow);
+        }
+        .dialog-btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 24px var(--el-glow);
+        }
+        .dialog-btn-secondary {
+            border: 1px solid var(--surface-border-light);
+            background: transparent;
+            color: var(--text-muted);
+        }
+        .dialog-btn-secondary:hover {
+            border-color: var(--text-secondary);
+            color: var(--text-secondary);
+        }
         .action-marker {
             padding: 3px 8px; border-radius: 4px;
             font-size: var(--font-size-xs);
@@ -863,6 +950,107 @@
         .char-switcher-btn[data-el="fire"]:hover { color: var(--fire-primary); border-color: var(--fire-border); }
         .char-switcher-btn[data-el="fire"].active img { border-color: var(--fire-primary); }
 
+        /* Top bar instruction mode */
+        .top-instruction {
+            display: flex; align-items: center; gap: var(--spacing-sm);
+            padding: var(--spacing-sm) var(--spacing-lg);
+            border-radius: var(--radius-md);
+            background: var(--el-bg);
+            border: 1px solid var(--el-border);
+        }
+        .top-instruction .material-icons { font-size: 18px; color: var(--warning); }
+        .top-instruction-text {
+            font-size: var(--font-size-sm); color: var(--text-secondary);
+            font-weight: 500;
+        }
+        .top-btn-cancel {
+            display: flex !important; align-items: center; gap: 4px;
+            width: auto !important; padding: 4px 12px !important;
+            color: var(--error) !important;
+            border-color: rgba(239, 83, 80, 0.3) !important;
+        }
+        .top-btn-cancel:hover {
+            background: rgba(239, 83, 80, 0.1) !important;
+        }
+        .cancel-label {
+            font-size: var(--font-size-xs); font-weight: 600;
+            text-transform: uppercase; letter-spacing: 1px;
+        }
+
+        /* Dialog action choice grid */
+        .dialog-body-actions { padding: var(--spacing-md); }
+        .dialog-action-grid {
+            display: flex; flex-direction: column;
+            gap: var(--spacing-sm);
+        }
+        .dialog-action-card {
+            display: flex; flex-direction: row;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--surface-border-light);
+            background: var(--surface);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            overflow: hidden;
+        }
+        .dialog-action-card:hover {
+            border-color: var(--el-border);
+            background: var(--bg-light);
+            box-shadow: 0 2px 12px rgba(0,0,0,0.3), 0 0 8px var(--el-glow);
+        }
+        .dialog-action-card.blocked {
+            opacity: 0.3; cursor: not-allowed; pointer-events: none;
+            position: relative;
+        }
+        .dialog-action-card.blocked::after {
+            content: 'COOLDOWN'; position: absolute; right: 10px; top: 50%;
+            transform: translateY(-50%);
+            font-size: var(--font-size-xs); color: var(--error);
+            letter-spacing: 2px; font-weight: 700; opacity: 0.6;
+        }
+        .dialog-action-card.special {
+            border-color: var(--gold-dark);
+            background: rgba(201, 168, 76, 0.04);
+        }
+        .dialog-action-card.special:hover {
+            border-color: var(--gold); background: rgba(201, 168, 76, 0.1);
+            box-shadow: 0 2px 12px rgba(0,0,0,0.3), 0 0 8px var(--gold-glow);
+        }
+        .dialog-action-icon {
+            width: 80px; align-self: stretch;
+            background-size: 200% 200%; background-repeat: no-repeat;
+            flex-shrink: 0;
+            filter: brightness(1.4) contrast(1.1); opacity: 0.85;
+            border-right: 1px solid var(--surface-border-light);
+        }
+        .dialog-action-card:hover .dialog-action-icon { opacity: 1; filter: brightness(1.6) contrast(1.1); }
+        .dialog-action-card-content { flex: 1; padding: var(--spacing-sm) var(--spacing-md); min-width: 0; }
+        .dialog-action-card-name {
+            font-family: var(--font-display);
+            font-size: var(--font-size-sm);
+            color: var(--el-primary); font-weight: 700;
+            margin-bottom: 2px;
+        }
+        .dialog-action-card.special .dialog-action-card-name { color: var(--gold); }
+        .dialog-action-card-desc {
+            font-size: var(--font-size-xs);
+            color: var(--text-secondary); line-height: 1.4;
+        }
+        .dialog-action-card-desc .token-inline {
+            width: 16px; height: 16px; border-radius: 50%;
+            vertical-align: middle; margin: 0 1px;
+        }
+        .dialog-action-card-desc .meeple-inline {
+            width: 14px; height: 14px; border-radius: 50%;
+            vertical-align: middle; margin: 0 1px;
+        }
+        .dialog-content .or-text {
+            color: var(--el-primary); font-weight: 600; margin: 0 4px;
+        }
+        .dialog-content .token-inline {
+            width: 20px; height: 20px; border-radius: 50%;
+            vertical-align: middle; margin: 0 2px;
+        }
+
         /* Corner frames */
         .corner-frame {
             position: absolute; width: 40px; height: 40px;
@@ -897,7 +1085,6 @@
             <div class="corner-frame bl"></div>
             <div class="corner-frame br"></div>
         </div>
-        <div id="bottom-panel"></div>
     </div>
     <!-- Position Tuner -->
     <div id="position-tuner">
