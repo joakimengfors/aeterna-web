@@ -1,5 +1,5 @@
 // ========================================
-// Player Panel (Left sidebar - opponents)
+// Player Panel (Left sidebar - all players)
 // ========================================
 
 import type { GameState } from '../game/GameState';
@@ -47,15 +47,16 @@ export class PlayerPanel {
 
   render(state: GameState) {
     const currentPlayer = state.currentPlayer;
-    const opponents = state.turnOrder.filter(t => t !== currentPlayer);
+    const specialCard = state.specialDeck.activeCard;
+    const nextCard = state.specialDeck.nextCard;
 
-    this.container.innerHTML = opponents.map(type => {
+    const playerCards = state.turnOrder.map(type => {
       const player = state.getPlayer(type);
+      const isActive = type === currentPlayer;
       const isHunting = HUNT_CHAIN[type] === currentPlayer;
-      const actions = getActionsForElemental(type);
 
       return `
-        <div class="player-card theme-${type}">
+        <div class="player-card theme-${type}${isActive ? ' active-turn' : ''}">
           <div class="player-card-header">
             <div class="player-avatar">
               <img src="${AVATAR_IMAGES[type]}" alt="${ELEMENTAL_NAMES[type]}" style="width:100%;height:100%;object-fit:cover;">
@@ -89,6 +90,27 @@ export class PlayerPanel {
         </div>
       `;
     }).join('');
+
+    const specialCardHtml = `
+      <div class="special-card-area">
+        <div class="special-card-label">
+          <span class="material-icons">auto_awesome</span>
+          Active Special Ability
+        </div>
+        <div class="special-card-active">
+          <div class="special-card-name">${specialCard?.name ?? 'No card'}</div>
+          <div class="special-card-desc">${specialCard?.description ?? ''}</div>
+        </div>
+        ${nextCard ? `
+          <div class="special-card-next">
+            <span class="special-card-next-label">Next:</span>
+            <span class="special-card-next-name">${nextCard.name}</span>
+          </div>
+        ` : ''}
+      </div>
+    `;
+
+    this.container.innerHTML = playerCards + specialCardHtml;
 
     // Show full-page character card overlay
     this.container.querySelectorAll('.action-info-btn').forEach(btn => {

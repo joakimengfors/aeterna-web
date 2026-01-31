@@ -10,7 +10,6 @@ import { checkWinConditions } from '../game/WinChecker';
 import { BoardRenderer } from './BoardRenderer';
 import { ActionBar } from './ActionBar';
 import { PlayerPanel } from './PlayerPanel';
-import { GameLog } from './GameLog';
 import { TopBar } from './TopBar';
 import type { ActionId, HexId, ElementalType } from '../game/types';
 import { getNeighbors, getLineHexes, isShore, ALL_HEX_IDS } from '../game/HexGrid';
@@ -22,7 +21,6 @@ export class HexInteraction {
   private board: BoardRenderer;
   private actionBar: ActionBar;
   private playerPanel: PlayerPanel;
-  private gameLog: GameLog;
   private topBar: TopBar;
 
   // State for multi-step actions
@@ -48,7 +46,6 @@ export class HexInteraction {
     board: BoardRenderer,
     actionBar: ActionBar,
     playerPanel: PlayerPanel,
-    gameLog: GameLog,
     topBar: TopBar,
   ) {
     this.state = state;
@@ -57,7 +54,6 @@ export class HexInteraction {
     this.board = board;
     this.actionBar = actionBar;
     this.playerPanel = playerPanel;
-    this.gameLog = gameLog;
     this.topBar = topBar;
 
     this.setupHandlers();
@@ -86,7 +82,6 @@ export class HexInteraction {
     this.board.clearHighlights();
     this.actionBar.render(this.state);
     this.playerPanel.render(this.state);
-    this.gameLog.render(this.state);
     this.topBar.render(this.state);
 
     // Update character switcher

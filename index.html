@@ -12,7 +12,7 @@
         /* Layout */
         .game-layout {
             display: grid;
-            grid-template-columns: 320px 1fr 320px;
+            grid-template-columns: 320px 1fr;
             grid-template-rows: auto 1fr auto;
             height: 100vh;
             width: 100vw;
@@ -218,14 +218,10 @@
             z-index: 2;
         }
 
-        #right-panel {
-            display: flex;
-            flex-direction: column;
-            gap: var(--spacing-md);
-            padding: var(--spacing-md);
-            overflow-y: auto;
-            background: var(--bg-dark);
-            border-left: 1px solid var(--surface-border);
+        /* Active turn border */
+        .player-card.active-turn {
+            border: 2px solid var(--el-primary);
+            box-shadow: 0 0 16px var(--el-glow), inset 0 0 8px var(--el-glow);
         }
 
         #bottom-panel { grid-column: 1 / -1; }
@@ -864,7 +860,6 @@
             <div class="corner-frame bl"></div>
             <div class="corner-frame br"></div>
         </div>
-        <div id="right-panel"></div>
         <div id="bottom-panel"></div>
     </div>
     <!-- Position Tuner -->
