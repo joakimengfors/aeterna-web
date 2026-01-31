@@ -217,15 +217,14 @@ export class HexInteraction {
               return;
             }
             const instruction = 'Place a Mountain on any empty hex';
-            this.dialog.showInfo('Raise Mountain', instruction, () => {
-              this.validTargets = targets;
-              this.state.phase = 'EXECUTING';
-              this.state.pendingAction = actionId;
-              this.state.stepInstruction = instruction;
-              this.board.render(this.state);
-              this.board.highlightValidTargets(targets, this.state.currentPlayer);
-              this.topBar.render(this.state);
-            });
+            this.validTargets = targets;
+            this.state.phase = 'EXECUTING';
+            this.state.pendingAction = actionId;
+            this.state.stepInstruction = instruction;
+            this.board.render(this.state);
+            this.board.highlightValidTargets(targets, this.state.currentPlayer);
+            this.topBar.render(this.state);
+            this.dialog.showInfo('Raise Mountain', instruction);
           },
         },
       ]);
@@ -248,15 +247,14 @@ export class HexInteraction {
               this.currentStep = 1;
               const moveTargets = this.executor.getFlameDashTargets();
               const instruction = `Move ${NAMES.fire} in a straight line`;
-              this.dialog.showInfo('Flame Dash', instruction, () => {
-                this.validTargets = moveTargets;
-                this.state.phase = 'EXECUTING';
-                this.state.pendingAction = actionId;
-                this.state.stepInstruction = instruction;
-                this.board.render(this.state);
-                this.board.highlightValidTargets(moveTargets, 'fire');
-                this.topBar.render(this.state);
-              });
+              this.validTargets = moveTargets;
+              this.state.phase = 'EXECUTING';
+              this.state.pendingAction = actionId;
+              this.state.stepInstruction = instruction;
+              this.board.render(this.state);
+              this.board.highlightValidTargets(moveTargets, 'fire');
+              this.topBar.render(this.state);
+              this.dialog.showInfo('Flame Dash', instruction);
             },
           },
           {
@@ -288,15 +286,14 @@ export class HexInteraction {
     const instruction = this.getStepInstruction(actionId, 0);
     const displayName = this.getActionDisplayName(actionId);
 
-    this.dialog.showInfo(displayName, instruction, () => {
-      this.validTargets = targets;
-      this.state.phase = 'EXECUTING';
-      this.state.pendingAction = actionId;
-      this.state.stepInstruction = instruction;
-      this.board.render(this.state);
-      this.board.highlightValidTargets(targets, this.state.currentPlayer);
-      this.topBar.render(this.state);
-    });
+    this.validTargets = targets;
+    this.state.phase = 'EXECUTING';
+    this.state.pendingAction = actionId;
+    this.state.stepInstruction = instruction;
+    this.board.render(this.state);
+    this.board.highlightValidTargets(targets, this.state.currentPlayer);
+    this.topBar.render(this.state);
+    this.dialog.showInfo(displayName, instruction);
   }
 
   private handleSpecialAbility() {
@@ -412,6 +409,9 @@ export class HexInteraction {
   private onHexClick(hexId: HexId) {
     if (!this.validTargets.includes(hexId)) return;
 
+    // Auto-dismiss any non-blocking info dialog
+    this.dialog.hide();
+
     // Fog movement sub-phase
     if (this.pendingFogMoves.length > 0) {
       this.handleFogMoveClick(hexId);
@@ -425,8 +425,7 @@ export class HexInteraction {
     }
 
     if (this.state.phase === 'EXECUTING' && !this.selectedAction) {
-      // SOT execution — hide SOT info, show confirm dialog
-      this.dialog.hide();
+      // SOT execution — show confirm dialog
       this.actionTargets = [hexId];
       this.board.highlightSelected(hexId);
       this.state.phase = 'CONFIRM';
@@ -490,18 +489,10 @@ export class HexInteraction {
       this.state.pendingFogMove = false;
       const fogHexes = this.executor.getFogTokenHexes();
       if (fogHexes.length > 0) {
-        this.dialog.showChoice('Fog Movement', `Move your ${fogHexes.length} Fog token${fogHexes.length > 1 ? 's' : ''}?`, [
-          { text: 'Yes', callback: () => {
-            this.startFogMovePhase(1, () => {
-              this.state.phase = 'CHOOSE_ACTION';
-              this.renderAll();
-            });
-          }},
-          { text: 'No', primary: false, callback: () => {
-            this.state.phase = 'CHOOSE_ACTION';
-            this.renderAll();
-          }},
-        ]);
+        this.startFogMovePhase(1, () => {
+          this.state.phase = 'CHOOSE_ACTION';
+          this.renderAll();
+        });
         return;
       }
     }
@@ -520,13 +511,12 @@ export class HexInteraction {
         // Step 1: move
         const instruction = `Move ${NAMES.earth} up to 1 hex`;
         const targets = this.executor.getValidTargets('raise-mountain');
-        this.dialog.showInfo('Raise Mountain', instruction, () => {
-          this.validTargets = targets;
-          this.state.stepInstruction = instruction;
-          this.board.render(this.state);
-          this.board.highlightValidTargets(targets, this.state.currentPlayer);
-          this.topBar.render(this.state);
-        });
+        this.validTargets = targets;
+        this.state.stepInstruction = instruction;
+        this.board.render(this.state);
+        this.board.highlightValidTargets(targets, this.state.currentPlayer);
+        this.topBar.render(this.state);
+        this.dialog.showInfo('Raise Mountain', instruction);
       } else {
         // Step 0 was move — apply movement
         const earth = this.state.getPlayer('earth');
@@ -536,13 +526,12 @@ export class HexInteraction {
         // Step 1: place mountain
         const instruction = 'Place a Mountain on any empty hex';
         const targets = this.executor.getRaiseMountainPlaceTargets();
-        this.dialog.showInfo('Raise Mountain', instruction, () => {
-          this.validTargets = targets;
-          this.state.stepInstruction = instruction;
-          this.board.render(this.state);
-          this.board.highlightValidTargets(targets, this.state.currentPlayer);
-          this.topBar.render(this.state);
-        });
+        this.validTargets = targets;
+        this.state.stepInstruction = instruction;
+        this.board.render(this.state);
+        this.board.highlightValidTargets(targets, this.state.currentPlayer);
+        this.topBar.render(this.state);
+        this.dialog.showInfo('Raise Mountain', instruction);
       }
     } else {
       this.actionTargets.push(hexId);
@@ -628,13 +617,12 @@ export class HexInteraction {
     } else {
       this.validTargets = this.validTargets.filter(t => t !== hexId);
       const instruction = 'Place 1 more Lake on an empty hex within range';
-      this.dialog.showInfo('Conjure Lakes', instruction, () => {
-        this.state.stepInstruction = instruction;
-        this.board.render(this.state);
-        this.board.highlightValidTargets(this.validTargets, this.state.currentPlayer);
-        this.board.highlightSelected(hexId);
-        this.topBar.render(this.state);
-      });
+      this.state.stepInstruction = instruction;
+      this.board.render(this.state);
+      this.board.highlightValidTargets(this.validTargets, this.state.currentPlayer);
+      this.board.highlightSelected(hexId);
+      this.topBar.render(this.state);
+      this.dialog.showInfo('Conjure Lakes', instruction);
     }
   }
 
@@ -675,13 +663,12 @@ export class HexInteraction {
     this.currentStep = 1;
     const instruction = `Move ${NAMES.fire} through connected fire`;
     const moveTargets = this.executor.getFirestormMoveTargets();
-    this.dialog.showInfo('Firestorm', instruction, () => {
-      this.state.stepInstruction = instruction;
-      this.validTargets = moveTargets;
-      this.board.render(this.state);
-      this.board.highlightValidTargets(moveTargets, this.state.currentPlayer);
-      this.topBar.render(this.state);
-    });
+    this.state.stepInstruction = instruction;
+    this.validTargets = moveTargets;
+    this.board.render(this.state);
+    this.board.highlightValidTargets(moveTargets, this.state.currentPlayer);
+    this.topBar.render(this.state);
+    this.dialog.showInfo('Firestorm', instruction);
   }
 
   private handleFlameDashStep(hexId: HexId) {
@@ -750,6 +737,22 @@ export class HexInteraction {
     this.board.render(this.state);
     this.board.highlightValidTargets(targets, 'water');
     this.topBar.render(this.state);
+
+    // Non-blocking fog info with Skip option
+    const fogLabel = this.fogMoveTotal === 1
+      ? 'Move your Fog'
+      : `Move Fog ${this.fogMoveIndex} of ${this.fogMoveTotal}`;
+    this.dialog.showInfoWithSkip('Fog Movement', fogLabel, () => {
+      // Skip all remaining fog moves
+      this.pendingFogMoves = [];
+      this.dialog.hide();
+      const cb = this.postFogCallback;
+      this.postFogCallback = null;
+      this.fogMoveRange = 0;
+      this.fogMoveIndex = 0;
+      this.fogMoveTotal = 0;
+      if (cb) cb();
+    });
   }
 
   private handleFogMoveClick(hexId: HexId) {
@@ -771,18 +774,13 @@ export class HexInteraction {
     }
 
     this.postForcedMoveCallback = callback;
-    this.dialog.showInfo(
-      'Forced Move!',
-      'Fire was placed on Kaijom\'s hex. Earth must move!',
-      () => {
-        this.validTargets = fm.validTargets;
-        this.state.stepInstruction = 'Choose a hex for Kaijom';
-        this.state.phase = 'EXECUTING';
-        this.board.render(this.state);
-        this.board.highlightValidTargets(fm.validTargets, 'earth');
-        this.topBar.render(this.state);
-      },
-    );
+    this.validTargets = fm.validTargets;
+    this.state.stepInstruction = 'Choose a hex for Kaijom';
+    this.state.phase = 'EXECUTING';
+    this.board.render(this.state);
+    this.board.highlightValidTargets(fm.validTargets, 'earth');
+    this.topBar.render(this.state);
+    this.dialog.showInfo('Forced Move!', 'Fire was placed on Kaijom\'s hex. Earth must move!');
   }
 
   private handleForcedMoveClick(hexId: HexId) {
@@ -878,20 +876,11 @@ export class HexInteraction {
 
       const fogHexes = this.executor.getFogTokenHexes();
       if (fogHexes.length > 0) {
-        this.dialog.showChoice('Fog Movement', `Move your ${fogHexes.length} Fog token${fogHexes.length > 1 ? 's' : ''}?`, [
-          { text: 'Yes', callback: () => {
-            this.startFogMovePhase(1, () => {
-              this.turnMgr.endTurn();
-              this.executor = new ActionExecutor(this.state);
-              this.showTurnBanner(() => this.renderAll());
-            });
-          }},
-          { text: 'No', primary: false, callback: () => {
-            this.turnMgr.endTurn();
-            this.executor = new ActionExecutor(this.state);
-            this.showTurnBanner(() => this.renderAll());
-          }},
-        ]);
+        this.startFogMovePhase(1, () => {
+          this.turnMgr.endTurn();
+          this.executor = new ActionExecutor(this.state);
+          this.showTurnBanner(() => this.renderAll());
+        });
         return;
       }
 

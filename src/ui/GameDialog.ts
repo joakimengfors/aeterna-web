@@ -182,8 +182,8 @@ export class GameDialog {
     this.show();
   }
 
-  showInfo(title: string, message: string, onContinue: () => void) {
-    this.cancelCallback = () => { this.hide(); onContinue(); };
+  showInfoWithSkip(title: string, message: string, onSkip: () => void) {
+    this.cancelCallback = null;
     this.content.innerHTML = `
       <div class="dialog-header">
         <div class="dialog-title">${title}</div>
@@ -192,13 +192,42 @@ export class GameDialog {
         <div class="dialog-message">${message}</div>
       </div>
       <div class="dialog-actions">
-        <button class="dialog-btn dialog-btn-primary" id="dialog-continue">Continue</button>
+        <button class="dialog-btn dialog-btn-secondary" data-idx="skip">Skip</button>
+        <button class="dialog-btn dialog-btn-primary" data-idx="ok">OK</button>
+      </div>
+    `;
+    this.content.querySelector('[data-idx="ok"]')!.addEventListener('click', () => {
+      this.hide();
+    });
+    this.content.querySelector('[data-idx="skip"]')!.addEventListener('click', () => {
+      onSkip();
+    });
+    // Non-blocking
+    this.overlay.style.pointerEvents = 'none';
+    this.content.style.pointerEvents = 'auto';
+    this.show();
+  }
+
+  showInfo(title: string, message: string, onDismiss?: () => void) {
+    this.cancelCallback = null;
+    this.content.innerHTML = `
+      <div class="dialog-header">
+        <div class="dialog-title">${title}</div>
+      </div>
+      <div class="dialog-body">
+        <div class="dialog-message">${message}</div>
+      </div>
+      <div class="dialog-actions">
+        <button class="dialog-btn dialog-btn-primary" id="dialog-continue">OK</button>
       </div>
     `;
     this.content.querySelector('#dialog-continue')!.addEventListener('click', () => {
       this.hide();
-      onContinue();
+      if (onDismiss) onDismiss();
     });
+    // Non-blocking: let clicks pass through to hexes
+    this.overlay.style.pointerEvents = 'none';
+    this.content.style.pointerEvents = 'auto';
     this.show();
   }
 
