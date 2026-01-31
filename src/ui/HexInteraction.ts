@@ -49,6 +49,9 @@ export class HexInteraction {
   // Raise Mountain order state
   private raiseMountainPlaceFirst = false;
 
+  // Track which special card is being executed
+  private activeSpecialCardId: string | null = null;
+
   // Mosey fog fix: save water hex before action execution
   private waterHexBeforeMosey: HexId | null = null;
 
@@ -151,12 +154,7 @@ export class HexInteraction {
     this.board.highlightValidTargets(targets, this.state.currentPlayer);
     this.topBar.render(this.state);
 
-    this.dialog.showSOT(this.state.currentPlayer, () => {
-      // OK — just dismiss, targets already active
-    }, () => {
-      // Skip SOT
-      this.onSOTSkip();
-    });
+    this.dialog.showSOT(this.state.currentPlayer, () => this.onSOTSkip());
   }
 
   private getSOTInstruction(): string {
@@ -299,6 +297,7 @@ export class HexInteraction {
   private handleSpecialAbility() {
     const card = this.state.specialDeck.activeCard;
     if (!card) return;
+    this.activeSpecialCardId = card.id;
 
     switch (card.id) {
       case 'start-of-turn':
@@ -395,11 +394,12 @@ export class HexInteraction {
     this.validTargets = targets;
     this.state.phase = 'EXECUTING';
     this.state.pendingAction = 'special';
-    this.state.stepInstruction = `Choose an elemental to swap with ${NAMES[this.state.currentPlayer]}`;
+    this.state.stepInstruction = 'Choose the first elemental to swap';
     this.currentStep = 0;
     this.board.render(this.state);
     this.board.highlightValidTargets(targets, this.state.currentPlayer);
     this.topBar.render(this.state);
+    this.dialog.showInfo('Swap Places', 'Choose 2 elementals to swap places');
   }
 
   // ==========================================
@@ -681,10 +681,37 @@ export class HexInteraction {
   }
 
   private handleSpecialStep(hexId: HexId) {
+    // Check if this is a swap-places card (2-step pick)
+    if (this.activeSpecialCardId === 'swap-places') {
+      this.actionTargets.push(hexId);
+      this.board.highlightSelected(hexId);
+
+      if (this.actionTargets.length === 1) {
+        // First elemental picked — now pick second
+        this.currentStep = 1;
+        const remaining = this.validTargets.filter(t => t !== hexId);
+        this.validTargets = remaining;
+        this.state.stepInstruction = 'Choose the second elemental to swap with';
+        this.board.render(this.state);
+        this.board.highlightValidTargets(remaining, this.state.currentPlayer);
+        this.board.highlightSelected(hexId);
+        this.topBar.render(this.state);
+        this.dialog.showInfo('Swap Places', 'Now choose the second elemental');
+      } else {
+        // Both picked — confirm
+        this.state.phase = 'CONFIRM';
+        this.board.render(this.state);
+        for (const t of this.actionTargets) this.board.highlightSelected(t);
+        this.topBar.render(this.state);
+        this.showConfirmDialog();
+      }
+      return;
+    }
+
+    // Other special cards: single-step move
     this.actionTargets.push(hexId);
     this.state.setElementalOnHex(hexId, this.state.currentPlayer);
     this.state.phase = 'CONFIRM';
-    this.checkWin();
     this.board.render(this.state);
     this.board.highlightSelected(hexId);
     this.topBar.render(this.state);
@@ -819,6 +846,23 @@ export class HexInteraction {
         return;
       }
 
+      // Swap Places special: swap the two selected elementals
+      if (this.selectedAction === 'special' && this.activeSpecialCardId === 'swap-places') {
+        const hex1 = this.actionTargets[0];
+        const hex2 = this.actionTargets[1];
+        const hexState1 = this.state.getHex(hex1);
+        const hexState2 = this.state.getHex(hex2);
+        const el1 = hexState1.elemental!;
+        const el2 = hexState2.elemental!;
+        this.state.setElementalOnHex(hex1, el2);
+        this.state.setElementalOnHex(hex2, el1);
+        this.state.addLog(`Swap Places — ${NAMES[el1]} and ${NAMES[el2]} swapped positions`);
+        this.turnMgr.setActionMarker(this.selectedAction);
+        this.activeSpecialCardId = null;
+        this.finishTurn();
+        return;
+      }
+
       // Raise Mountain with place-first: swap targets so executor gets [moveHex, placeHex]
       if (this.selectedAction === 'raise-mountain' && this.raiseMountainPlaceFirst) {
         this.actionTargets = [this.actionTargets[1], this.actionTargets[0]];
@@ -902,6 +946,7 @@ export class HexInteraction {
     this.state.stepInstruction = '';
     this.flameDashPlacedFirst = false;
     this.raiseMountainPlaceFirst = false;
+    this.activeSpecialCardId = null;
     this.waterHexBeforeMosey = null;
     this.turnMgr.endTurn();
     this.executor = new ActionExecutor(this.state);
@@ -942,6 +987,7 @@ export class HexInteraction {
     this.validTargets = [];
     this.flameDashPlacedFirst = false;
     this.raiseMountainPlaceFirst = false;
+    this.activeSpecialCardId = null;
     this.waterHexBeforeMosey = null;
     this.pendingFogMoves = [];
     this.fogMoveRange = 0;

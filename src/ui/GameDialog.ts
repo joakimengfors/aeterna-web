@@ -62,7 +62,7 @@ export class GameDialog {
     });
   }
 
-  showSOT(elementalType: ElementalType, onDismiss: () => void, onSkip: () => void) {
+  showSOT(elementalType: ElementalType, onSkip: () => void) {
     this.cancelCallback = null;
     this.content.innerHTML = `
       <div class="dialog-header">
@@ -73,13 +73,8 @@ export class GameDialog {
       </div>
       <div class="dialog-actions">
         <button class="dialog-btn dialog-btn-secondary" data-idx="skip">Skip</button>
-        <button class="dialog-btn dialog-btn-primary" data-idx="ok">OK</button>
       </div>
     `;
-    this.content.querySelector('[data-idx="ok"]')!.addEventListener('click', () => {
-      this.hide();
-      onDismiss();
-    });
     this.content.querySelector('[data-idx="skip"]')!.addEventListener('click', () => {
       this.hide();
       onSkip();
@@ -193,12 +188,8 @@ export class GameDialog {
       </div>
       <div class="dialog-actions">
         <button class="dialog-btn dialog-btn-secondary" data-idx="skip">Skip</button>
-        <button class="dialog-btn dialog-btn-primary" data-idx="ok">OK</button>
       </div>
     `;
-    this.content.querySelector('[data-idx="ok"]')!.addEventListener('click', () => {
-      this.hide();
-    });
     this.content.querySelector('[data-idx="skip"]')!.addEventListener('click', () => {
       onSkip();
     });
@@ -208,7 +199,7 @@ export class GameDialog {
     this.show();
   }
 
-  showInfo(title: string, message: string, onDismiss?: () => void) {
+  showInfo(title: string, message: string) {
     this.cancelCallback = null;
     this.content.innerHTML = `
       <div class="dialog-header">
@@ -217,17 +208,12 @@ export class GameDialog {
       <div class="dialog-body">
         <div class="dialog-message">${message}</div>
       </div>
-      <div class="dialog-actions">
-        <button class="dialog-btn dialog-btn-primary" id="dialog-continue">OK</button>
-      </div>
     `;
-    this.content.querySelector('#dialog-continue')!.addEventListener('click', () => {
-      this.hide();
-      if (onDismiss) onDismiss();
-    });
-    // Non-blocking: let clicks pass through to hexes
+    // Non-blocking: let clicks pass through to hexes, auto-dismissed on next hex click
     this.overlay.style.pointerEvents = 'none';
     this.content.style.pointerEvents = 'auto';
+    // Click dialog itself to dismiss
+    this.content.addEventListener('click', () => this.hide(), { once: true });
     this.show();
   }
 
