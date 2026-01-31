@@ -577,27 +577,55 @@ export class ActionExecutor {
   }
 
   private getFirestormPlacementTargets(): HexId[] {
-    // Valid placement: empty hex adjacent to existing fire group, Forest hex, or Earth's hex
+    return this.getFirestormPlacementTargetsForGroups(this.getFireGroups());
+  }
+
+  /** Get valid placement hexes adjacent to a specific set of fire group hexes */
+  getFirestormPlacementTargetsForGroups(groups: { id: string; hexes: Set<HexId> }[]): HexId[] {
     const targets: HexId[] = [];
-    const fireHexes = new Set<HexId>();
-
-    for (const [id, hex] of this.state.board) {
-      if (hex.tokens.includes('fire')) fireHexes.add(id);
-    }
-
-    for (const fh of fireHexes) {
-      for (const n of getNeighbors(fh)) {
-        const nHex = this.state.getHex(n);
-        const nonFog = nHex.tokens.filter(t => t !== 'fog');
-        if (nonFog.length === 0 || nHex.tokens.includes('forest')) {
-          if (!nHex.tokens.includes('mountain') && !nHex.tokens.includes('lake')) {
+    for (const group of groups) {
+      for (const fh of group.hexes) {
+        for (const n of getNeighbors(fh)) {
+          const nHex = this.state.getHex(n);
+          if (nHex.tokens.includes('mountain') || nHex.tokens.includes('lake')) continue;
+          if (nHex.tokens.includes('fire')) continue; // already has fire
+          const nonFog = nHex.tokens.filter(t => t !== 'fog');
+          if (nonFog.length === 0 || nHex.tokens.includes('forest')) {
             targets.push(n);
           }
         }
       }
     }
-
     return [...new Set(targets)];
+  }
+
+  /** Snapshot all fire groups on the board (connected components) */
+  getFireGroups(): { id: string; hexes: Set<HexId> }[] {
+    const fireHexes = new Set<HexId>();
+    for (const [id, hex] of this.state.board) {
+      if (hex.tokens.includes('fire')) fireHexes.add(id);
+    }
+    const visited = new Set<HexId>();
+    const groups: { id: string; hexes: Set<HexId> }[] = [];
+    for (const fh of fireHexes) {
+      if (visited.has(fh)) continue;
+      const group = this.getConnectedFire(fh);
+      const id = [...group].sort().join(',');
+      groups.push({ id, hexes: group });
+      for (const h of group) visited.add(h);
+    }
+    return groups;
+  }
+
+  /** Place a single firestorm fire token on the board immediately */
+  placeFirestormToken(hex: HexId): void {
+    if (this.state.hasToken(hex, 'forest')) {
+      this.state.destroyToken(hex, 'forest');
+    }
+    if (this.state.takeFromSupply('fire', 'fire')) {
+      this.state.addToken(hex, 'fire');
+    }
+    // If on Earth's hex, force Earth to move (handled later in UI)
   }
 
   /** Get firestorm movement targets (after placing fire tokens) */
@@ -607,23 +635,18 @@ export class ActionExecutor {
     const targets: HexId[] = [fire.hexId]; // Can stay
 
     if (this.state.hasToken(fire.hexId, 'fire')) {
-      // On fire: move through connected fire + 1 extra
+      // On fire: move through connected fire only
       const connected = this.getConnectedFire(fire.hexId);
       for (const fh of connected) {
         targets.push(fh);
-        // +1 hex beyond connected fire
-        for (const n of getNeighbors(fh)) {
-          if (!connected.has(n) && this.canFireEnd(n)) {
-            targets.push(n);
-          }
-        }
       }
-      // Plus bonus
+      // Bonus (supply <= 4): can move 1 hex beyond connected fire
       if (bonus > 0) {
-        // Extra range beyond the +1
-        for (const t of [...targets]) {
-          for (const n of getNeighbors(t)) {
-            if (this.canFireEnd(n)) targets.push(n);
+        for (const fh of connected) {
+          for (const n of getNeighbors(fh)) {
+            if (!connected.has(n) && this.canFireEnd(n)) {
+              targets.push(n);
+            }
           }
         }
       }
@@ -656,23 +679,15 @@ export class ActionExecutor {
   }
 
   private executeFirestorm(targets: HexId[]): string {
-    // targets: up to 3 placement hexes, then optionally a move hex as last element
-    const placementTargets = targets.slice(0, Math.min(3, targets.length - 1));
+    // Fire tokens are already placed live during UI flow.
+    // targets: [placed1, placed2, ..., moveTarget]
+    // The last target is always the move target (may equal current position = no move)
     const moveTarget = targets[targets.length - 1];
+    const placed = targets.slice(0, -1);
 
-    const placed: HexId[] = [];
-    for (const hex of placementTargets) {
-      // Destroy forest if present
-      if (this.state.hasToken(hex, 'forest')) {
-        this.state.destroyToken(hex, 'forest');
-      }
-      if (this.state.takeFromSupply('fire', 'fire')) {
-        this.state.addToken(hex, 'fire');
-        placed.push(hex);
-      }
-
-      // If on Earth's hex, force Earth to move
-      const earth = this.state.getPlayer('earth');
+    // Check if any placed fire is on Earth's hex
+    const earth = this.state.getPlayer('earth');
+    for (const hex of placed) {
       if (hex === earth.hexId) {
         this.handleFireOnEarth();
       }
@@ -684,7 +699,7 @@ export class ActionExecutor {
       this.state.setElementalOnHex(moveTarget, 'fire');
     }
 
-    return `Firestorm — placed Fire on ${placed.join(', ')}${moveTarget ? `, moved to hex ${moveTarget}` : ''}`;
+    return `Firestorm — placed Fire on ${placed.join(', ')}${moveTarget && moveTarget !== this.state.getPlayer('fire').hexId ? `, moved to ${moveTarget}` : ''}`;
   }
 
   private getFirewallDirectionHexes(): HexId[] {

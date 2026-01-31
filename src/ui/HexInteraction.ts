@@ -49,6 +49,11 @@ export class HexInteraction {
   // Raise Mountain order state
   private raiseMountainPlaceFirst = false;
 
+  // Firestorm: snapshot of fire groups at start, track which have been extended
+  private firestormGroups: { id: string; hexes: Set<string> }[] = [];
+  private firestormExtendedGroupIds = new Set<string>();
+  private firestormMaxTokens = 0;
+
   // Track which special card is being executed
   private activeSpecialCardId: string | null = null;
 
@@ -182,6 +187,9 @@ export class HexInteraction {
     this.currentStep = 0;
     this.flameDashPlacedFirst = false;
     this.raiseMountainPlaceFirst = false;
+    this.firestormGroups = [];
+    this.firestormExtendedGroupIds.clear();
+    this.firestormMaxTokens = 0;
     this.waterHexBeforeMosey = null;
 
     if (actionId === 'special') {
@@ -277,6 +285,11 @@ export class HexInteraction {
       this.state.phase = 'CHOOSE_ACTION';
       this.renderAll();
       return;
+    }
+
+    if (actionId === 'firestorm') {
+      this.firestormGroups = this.executor.getFireGroups();
+      this.firestormMaxTokens = Math.min(this.firestormGroups.length, 3);
     }
 
     const instruction = this.getStepInstruction(actionId, 0);
@@ -625,36 +638,52 @@ export class HexInteraction {
   }
 
   private handleFirestormStep(hexId: HexId) {
-    this.actionTargets.push(hexId);
-    this.board.highlightSelected(hexId);
-
     if (this.currentStep === 1) {
+      // Movement step
+      this.actionTargets.push(hexId);
       this.state.phase = 'CONFIRM';
       this.topBar.render(this.state);
       this.showConfirmDialog();
       return;
     }
 
-    if (this.actionTargets.length >= 3) {
+    // Placement step: identify which original group this hex is adjacent to
+    const group = this.firestormGroups.find(g => {
+      for (const fh of g.hexes) {
+        if (getNeighbors(fh).includes(hexId)) return true;
+      }
+      return false;
+    });
+    if (group) this.firestormExtendedGroupIds.add(group.id);
+
+    this.executor.placeFirestormToken(hexId);
+    this.actionTargets.push(hexId);
+
+    const placed = this.actionTargets.length;
+    const remaining = this.firestormMaxTokens - placed;
+
+    // Get targets from original groups not yet extended
+    const availableGroups = this.firestormGroups.filter(g => !this.firestormExtendedGroupIds.has(g.id));
+    const nextTargets = remaining > 0
+      ? this.executor.getFirestormPlacementTargetsForGroups(availableGroups)
+      : [];
+
+    if (placed >= this.firestormMaxTokens || nextTargets.length === 0) {
       this.firestormMoveToMovement();
       return;
     }
 
-    const remaining = 3 - this.actionTargets.length;
-    this.validTargets = this.validTargets.filter(t => t !== hexId);
-
-    this.dialog.showChoice('Firestorm', `${this.actionTargets.length} fire token${this.actionTargets.length > 1 ? 's' : ''} placed. Place more or move?`, [
-      { text: `Place More (${remaining} left)`, callback: () => {
-        this.state.stepInstruction = `Place fire adjacent to existing fire (${remaining} remaining)`;
-        this.board.render(this.state);
-        this.board.highlightValidTargets(this.validTargets, this.state.currentPlayer);
-        for (const t of this.actionTargets) this.board.highlightSelected(t);
-        this.topBar.render(this.state);
-      }},
-      { text: 'Move Now', primary: false, callback: () => {
-        this.firestormMoveToMovement();
-      }},
-    ]);
+    // Show updated board, highlight next targets, non-blocking skip dialog
+    this.validTargets = nextTargets;
+    const instruction = `Place fire on a different group (${remaining} remaining)`;
+    this.state.stepInstruction = instruction;
+    this.board.render(this.state);
+    this.board.highlightValidTargets(nextTargets, this.state.currentPlayer);
+    this.topBar.render(this.state);
+    this.dialog.showInfoWithSkip('Firestorm', instruction, () => {
+      this.dialog.hide();
+      this.firestormMoveToMovement();
+    }, () => this.onUndo());
   }
 
   private firestormMoveToMovement() {
@@ -890,14 +919,6 @@ export class HexInteraction {
     } else if (this.state.phase === 'EXECUTING' && this.selectedAction === 'landslide' && this.currentStep === 1) {
       this.state.phase = 'CONFIRM';
       this.onConfirm();
-    } else if (this.state.phase === 'EXECUTING' && this.selectedAction === 'firestorm' && this.currentStep === 0) {
-      this.currentStep = 1;
-      const moveTargets = this.executor.getFirestormMoveTargets();
-      this.validTargets = moveTargets;
-      this.state.stepInstruction = `Move ${NAMES.fire} through connected fire`;
-      this.board.render(this.state);
-      this.board.highlightValidTargets(moveTargets, this.state.currentPlayer);
-      this.topBar.render(this.state);
     }
   }
 
@@ -944,6 +965,9 @@ export class HexInteraction {
     this.state.stepInstruction = '';
     this.flameDashPlacedFirst = false;
     this.raiseMountainPlaceFirst = false;
+    this.firestormGroups = [];
+    this.firestormExtendedGroupIds.clear();
+    this.firestormMaxTokens = 0;
     this.activeSpecialCardId = null;
     this.waterHexBeforeMosey = null;
     this.turnMgr.endTurn();
@@ -985,6 +1009,9 @@ export class HexInteraction {
     this.validTargets = [];
     this.flameDashPlacedFirst = false;
     this.raiseMountainPlaceFirst = false;
+    this.firestormGroups = [];
+    this.firestormExtendedGroupIds.clear();
+    this.firestormMaxTokens = 0;
     this.activeSpecialCardId = null;
     this.waterHexBeforeMosey = null;
     this.pendingFogMoves = [];
@@ -1022,7 +1049,7 @@ export class HexInteraction {
       case 'conjure':
         return 'Place 2 Lakes on empty hexes within 3 range';
       case 'firestorm':
-        return step === 0 ? 'Place up to 3 fire tokens adjacent to existing fire (3 remaining)' : `Move ${name} through connected fire`;
+        return step === 0 ? `Place fire on a fire group (${this.firestormMaxTokens} token${this.firestormMaxTokens !== 1 ? 's' : ''})` : `Move ${name} through connected fire`;
       case 'flame-dash':
         return `Move ${name} in a straight line`;
       case 'smoke-dash':
