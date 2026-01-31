@@ -1,0 +1,165 @@
+/* ============================================
+   Aeterna: Clash of Elements - Design System
+   ============================================
+   Dark fantasy board game UI
+   Three elemental themes: Earth/Water/Fire
+   ============================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap');
+
+:root {
+    /* Core palette */
+    --bg-darkest: #0a0b0f;
+    --bg-dark: #12141c;
+    --bg-medium: #1a1d2a;
+    --bg-light: #232738;
+    --bg-lighter: #2c3148;
+
+    /* Surface */
+    --surface: #1a1d2a;
+    --surface-hover: #232738;
+    --surface-active: #2c3148;
+    --surface-border: rgba(255, 255, 255, 0.06);
+    --surface-border-light: rgba(255, 255, 255, 0.1);
+
+    /* Text */
+    --text-primary: #e8e6e3;
+    --text-secondary: #9a9caa;
+    --text-muted: #5c5e6e;
+    --text-bright: #ffffff;
+
+    /* Earth / Kaijom */
+    --earth-primary: #4caf50;
+    --earth-secondary: #81c784;
+    --earth-dark: #2e7d32;
+    --earth-glow: rgba(76, 175, 80, 0.3);
+    --earth-bg: rgba(76, 175, 80, 0.08);
+    --earth-border: rgba(76, 175, 80, 0.25);
+    --earth-gradient: linear-gradient(135deg, #2e7d32 0%, #4caf50 100%);
+
+    /* Water / Nitsuji */
+    --water-primary: #29b6f6;
+    --water-secondary: #81d4fa;
+    --water-dark: #0288d1;
+    --water-glow: rgba(41, 182, 246, 0.3);
+    --water-bg: rgba(41, 182, 246, 0.08);
+    --water-border: rgba(41, 182, 246, 0.25);
+    --water-gradient: linear-gradient(135deg, #0288d1 0%, #29b6f6 100%);
+
+    /* Fire / Krakatoa */
+    --fire-primary: #ff7043;
+    --fire-secondary: #ffab91;
+    --fire-dark: #d84315;
+    --fire-glow: rgba(255, 112, 67, 0.3);
+    --fire-bg: rgba(255, 112, 67, 0.08);
+    --fire-border: rgba(255, 112, 67, 0.25);
+    --fire-gradient: linear-gradient(135deg, #d84315 0%, #ff7043 100%);
+
+    /* Token colors */
+    --token-mountain: #78909c;
+    --token-forest: #66bb6a;
+    --token-fire: #ff7043;
+    --token-lake: #29b6f6;
+    --token-fog: #b0bec5;
+
+    /* Status */
+    --success: #66bb6a;
+    --warning: #ffa726;
+    --error: #ef5350;
+    --info: #42a5f5;
+
+    /* Gold accents */
+    --gold: #c9a84c;
+    --gold-light: #e8d48b;
+    --gold-dark: #8b6914;
+    --gold-glow: rgba(201, 168, 76, 0.3);
+
+    /* Spacing */
+    --spacing-xs: 4px;
+    --spacing-sm: 8px;
+    --spacing-md: 16px;
+    --spacing-lg: 24px;
+    --spacing-xl: 32px;
+    --spacing-2xl: 48px;
+
+    /* Typography */
+    --font-display: 'Cinzel', serif;
+    --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-size-xs: 11px;
+    --font-size-sm: 13px;
+    --font-size-base: 14px;
+    --font-size-lg: 16px;
+    --font-size-xl: 20px;
+    --font-size-2xl: 28px;
+    --font-size-3xl: 36px;
+
+    /* Shadows */
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+    --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.6);
+    --shadow-glow-earth: 0 0 20px rgba(76, 175, 80, 0.3);
+    --shadow-glow-water: 0 0 20px rgba(41, 182, 246, 0.3);
+    --shadow-glow-fire: 0 0 20px rgba(255, 112, 67, 0.3);
+
+    /* Border radius */
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+    --radius-round: 50%;
+
+    /* Transitions */
+    --transition-fast: 0.15s ease;
+    --transition-base: 0.25s ease;
+    --transition-slow: 0.4s ease;
+}
+
+/* Reset */
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: var(--font-body);
+    background: var(--bg-darkest);
+    color: var(--text-primary);
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+}
+::-webkit-scrollbar-track {
+    background: var(--bg-dark);
+}
+::-webkit-scrollbar-thumb {
+    background: var(--bg-lighter);
+    border-radius: 3px;
+}
+
+/* Common utility */
+.material-icons {
+    font-family: 'Material Icons';
+    font-weight: normal;
+    font-style: normal;
+    display: inline-block;
+    line-height: 1;
+    text-transform: none;
+    letter-spacing: normal;
+    word-wrap: normal;
+    white-space: nowrap;
+    direction: ltr;
+    vertical-align: middle;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* Elemental theme classes */
+.theme-earth { --el-primary: var(--earth-primary); --el-secondary: var(--earth-secondary); --el-dark: var(--earth-dark); --el-glow: var(--earth-glow); --el-bg: var(--earth-bg); --el-border: var(--earth-border); --el-gradient: var(--earth-gradient); }
+.theme-water { --el-primary: var(--water-primary); --el-secondary: var(--water-secondary); --el-dark: var(--water-dark); --el-glow: var(--water-glow); --el-bg: var(--water-bg); --el-border: var(--water-border); --el-gradient: var(--water-gradient); }
+.theme-fire { --el-primary: var(--fire-primary); --el-secondary: var(--fire-secondary); --el-dark: var(--fire-dark); --el-glow: var(--fire-glow); --el-bg: var(--fire-bg); --el-border: var(--fire-border); --el-gradient: var(--fire-gradient); }
