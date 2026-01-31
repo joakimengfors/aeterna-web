@@ -90,20 +90,21 @@
         .hex-cell.dimmed polygon { fill: rgba(80, 120, 60, 0.03); stroke: rgba(120, 160, 80, 0.08); }
         .hex-cell.dimmed .hex-number { fill: rgba(120, 160, 80, 0.15); }
         .hex-cell.valid-target polygon {
-            fill: rgba(160, 100, 220, 0.25);
-            stroke: #b070e0;
-            stroke-width: 2;
-            filter: drop-shadow(0 0 6px rgba(160, 100, 220, 0.4));
+            fill: rgba(201, 168, 76, 0.08);
+            stroke: var(--gold, #c9a84c);
+            stroke-width: 2.5;
+            filter: drop-shadow(0 0 8px rgba(201, 168, 76, 0.5));
             animation: hex-pulse 2s ease infinite;
         }
         @keyframes hex-pulse {
-            0%, 100% { filter: drop-shadow(0 0 4px rgba(160, 100, 220, 0.3)); }
-            50% { filter: drop-shadow(0 0 12px rgba(160, 100, 220, 0.5)); }
+            0%, 100% { filter: drop-shadow(0 0 6px rgba(201, 168, 76, 0.4)); }
+            50% { filter: drop-shadow(0 0 16px rgba(201, 168, 76, 0.7)); }
         }
         .hex-cell.valid-target:hover polygon {
-            fill: rgba(160, 100, 220, 0.45);
-            stroke: #c090f0;
-            stroke-width: 2.5;
+            fill: rgba(201, 168, 76, 0.18);
+            stroke: var(--gold-light, #e0c878);
+            stroke-width: 3;
+            filter: drop-shadow(0 0 14px rgba(201, 168, 76, 0.7));
         }
         .hex-cell.selected polygon {
             fill: rgba(76, 175, 80, 0.5);
@@ -123,14 +124,13 @@
             50% { fill: rgba(239, 83, 80, 0.3); }
         }
 
-        .valid-indicator circle {
-            fill: var(--el-primary, #4caf50);
-            opacity: 0.7;
-            animation: indicator-pulse 2s ease infinite;
+
+        .hex-wall {
+            animation: wall-pulse 2s ease infinite;
         }
-        @keyframes indicator-pulse {
-            0%, 100% { r: 4; opacity: 0.7; }
-            50% { r: 6; opacity: 0.4; }
+        @keyframes wall-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
         }
 
         .hex-token { pointer-events: none; }

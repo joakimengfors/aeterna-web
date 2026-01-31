@@ -254,17 +254,21 @@ export class BoardRenderer {
       if (g) {
         g.classList.add('valid-target');
 
-        // Add pulsing indicator dot
+        // Draw rising wall effect in highlight layer
         const pos = getPixelPos(id);
-        const indicator = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-        indicator.classList.add('valid-indicator');
-        indicator.setAttribute('transform', `translate(${pos.x},${pos.y - 14})`);
-        const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-        dot.setAttribute('cx', '0');
-        dot.setAttribute('cy', '0');
-        dot.setAttribute('r', '4');
-        indicator.appendChild(dot);
-        this.highlightLayer.appendChild(indicator);
+        const wallLayers = 6;
+        for (let i = 1; i <= wallLayers; i++) {
+          const wall = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+          wall.setAttribute('points', HEX_POINTS);
+          wall.setAttribute('transform', `translate(${pos.x},${pos.y - i * 2.5})`);
+          const opacity = 0.7 - (i / wallLayers) * 0.5;
+          wall.setAttribute('fill', 'none');
+          wall.setAttribute('stroke', `rgba(255, 255, 255, ${opacity})`);
+          wall.setAttribute('stroke-width', '2');
+          wall.classList.add('hex-wall');
+          wall.style.pointerEvents = 'none';
+          this.highlightLayer.appendChild(wall);
+        }
       }
     }
   }
