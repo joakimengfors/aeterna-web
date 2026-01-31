@@ -703,13 +703,12 @@ export class ActionExecutor {
   }
 
   private getFirewallDirectionHexes(): HexId[] {
-    // Return all hexes in the 6 directions (first 3 in each)
+    // Return all hexes in all 6 directions (up to 3 each)
     const fire = this.state.getPlayer('fire');
     const lines = getLineHexes(fire.hexId, 3);
     const targets: HexId[] = [];
     for (const { hexes } of lines) {
-      // Show the first hex of each direction as a "direction picker"
-      if (hexes.length > 0) targets.push(hexes[0]);
+      for (const h of hexes) targets.push(h);
     }
     return targets;
   }
