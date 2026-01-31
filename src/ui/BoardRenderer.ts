@@ -105,53 +105,80 @@ export class BoardRenderer {
   }
 
   render(state: GameState) {
-    this.renderTokens(state);
     this.renderStandees(state);
+    this.renderTokens(state);
   }
 
   private renderTokens(state: GameState) {
     this.tokenLayer.innerHTML = '';
+    // Clear standing token containers (fog/mountain go in standee overlay)
+    this.standeeContainer.querySelectorAll('.token-standee').forEach(el => el.remove());
 
     for (const id of ALL_HEX_IDS) {
       const hex = state.getHex(id);
       const pos = getPixelPos(id);
 
       for (const token of hex.tokens) {
+        // Fog and mountain render as standing pieces in HTML overlay
+        if (token === 'fog' || token === 'mountain') {
+          this.renderTokenStandee(token, pos, id, hex.tokens);
+          continue;
+        }
+
         const img = document.createElementNS('http://www.w3.org/2000/svg', 'image');
         img.setAttribute('href', TOKEN_IMAGES[token]);
         img.classList.add('hex-token');
 
-        if (token === 'fog') {
-          img.setAttribute('x', '-18');
-          img.setAttribute('y', '-18');
-          img.setAttribute('width', '36');
-          img.setAttribute('height', '36');
-          // Offset fog slightly if stacked with lake
-          const offsetX = hex.tokens.includes('lake') ? 28.8 : 0;
-          const offsetY = hex.tokens.includes('lake') ? 25.2 : 0;
-          img.setAttribute('transform', `translate(${pos.x + offsetX},${pos.y + offsetY})`);
-          img.setAttribute('clip-path', 'url(#clip-token-sm)');
-          img.style.opacity = '0.7';
-        } else if (token === 'mountain') {
-          img.setAttribute('x', '-36');
-          img.setAttribute('y', '-28.8');
-          img.setAttribute('width', '72');
-          img.setAttribute('height', '57.6');
-          img.setAttribute('transform', `translate(${pos.x},${pos.y})`);
-        } else {
-          const size = token === 'fire' ? 50.4 : 57.6;
-          const half = size / 2;
-          img.setAttribute('x', String(-half));
-          img.setAttribute('y', String(-half));
-          img.setAttribute('width', String(size));
-          img.setAttribute('height', String(size));
-          img.setAttribute('transform', `translate(${pos.x},${pos.y})`);
-          img.setAttribute('clip-path', token === 'fire' ? 'url(#clip-token-md)' : 'url(#clip-token-lg)');
-        }
+        const size = token === 'fire' ? 50.4 : 57.6;
+        const half = size / 2;
+        img.setAttribute('x', String(-half));
+        img.setAttribute('y', String(-half));
+        img.setAttribute('width', String(size));
+        img.setAttribute('height', String(size));
+        img.setAttribute('transform', `translate(${pos.x},${pos.y})`);
+        img.setAttribute('clip-path', token === 'fire' ? 'url(#clip-token-md)' : 'url(#clip-token-lg)');
 
         this.tokenLayer.appendChild(img);
       }
     }
+  }
+
+  private renderTokenStandee(token: TokenType, pos: { x: number; y: number }, hexId: HexId, allTokens: TokenType[]) {
+    // Shadow on the board (SVG)
+    const shadow = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
+    const isFog = token === 'fog';
+    const shadowRx = isFog ? 10 : 16;
+    const shadowRy = isFog ? 5 : 7;
+    const offsetX = 0;
+    shadow.setAttribute('cx', String(pos.x + offsetX));
+    shadow.setAttribute('cy', String(pos.y + 6));
+    shadow.setAttribute('rx', String(shadowRx));
+    shadow.setAttribute('ry', String(shadowRy));
+    shadow.setAttribute('fill', 'rgba(0,0,0,0.35)');
+    shadow.style.pointerEvents = 'none';
+    this.tokenLayer.appendChild(shadow);
+
+    // HTML standing piece
+    const el = document.createElement('div');
+    el.className = `standee-3d token-standee token-standee-${token}`;
+    el.style.left = `${((pos.x + offsetX) / 628) * 100}%`;
+    el.style.top = `${(pos.y / 700) * 100}%`;
+
+    if (isFog) {
+      el.innerHTML = `
+        <div class="standee-figure standee-figure-fog">
+          <img src="${TOKEN_IMAGES.fog}" alt="Fog">
+        </div>
+      `;
+    } else {
+      el.innerHTML = `
+        <div class="standee-figure standee-figure-mountain">
+          <img src="${TOKEN_IMAGES.mountain}" alt="Mountain">
+        </div>
+      `;
+    }
+
+    this.standeeContainer.appendChild(el);
   }
 
   private renderStandees(state: GameState) {
