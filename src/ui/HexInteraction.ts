@@ -847,12 +847,17 @@ export class HexInteraction {
 
     // Other special cards: single-step move
     this.actionTargets.push(hexId);
-    this.state.setElementalOnHex(hexId, this.state.currentPlayer);
+    const currentPlayer = this.state.currentPlayer;
+    const playerState = this.state.getPlayer(currentPlayer);
+    this.queueMoveAnimation(currentPlayer, playerState.hexId, hexId);
+    this.state.setElementalOnHex(hexId, currentPlayer);
     this.state.phase = 'CONFIRM';
     this.board.render(this.state);
-    this.board.highlightSelected(hexId);
-    this.topBar.render(this.state);
-    this.showConfirmDialog();
+    this.playPendingAnimation().then(() => {
+      this.board.highlightSelected(hexId);
+      this.topBar.render(this.state);
+      this.showConfirmDialog();
+    });
   }
 
   // ==========================================
@@ -1036,12 +1041,16 @@ export class HexInteraction {
         const hexState2 = this.state.getHex(hex2);
         const el1 = hexState1.elemental!;
         const el2 = hexState2.elemental!;
+        this.queueMoveAnimation(el1, hex1, hex2);
         this.state.setElementalOnHex(hex1, el2);
         this.state.setElementalOnHex(hex2, el1);
         this.state.addLog(`Swap Places — ${NAMES[el1]} and ${NAMES[el2]} swapped positions`);
         this.turnMgr.setActionMarker(this.selectedAction);
         this.activeSpecialCardId = null;
-        this.finishTurn();
+        this.board.render(this.state);
+        this.playPendingAnimation().then(() => {
+          this.finishTurn();
+        });
         return;
       }
 
