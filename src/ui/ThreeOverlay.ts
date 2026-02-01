@@ -213,11 +213,11 @@ export class ThreeOverlay {
         const endX = positions[step].x;
         const endY = positions[step].y;
 
-        // Rotate on Z to face destination on the board plane
+        // Rotate on Z so the model's front faces the destination
         const dx = endX - startX;
         const dy = endY - startY;
-        // atan2(-dx, dy) gives angle from +Y (up/north) rotating clockwise
-        const turnAngle = Math.atan2(-dx, dy);
+        // +PI so the front (not the back) points toward the destination
+        const turnAngle = Math.atan2(-dx, dy) + Math.PI;
 
         await this.animateRotation(pivot, pivot.rotation.z, turnAngle, TURN_MS);
 
