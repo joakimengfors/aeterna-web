@@ -164,14 +164,14 @@ export class ThreeOverlay {
     entry.pivot.position.y = VB_H - pos.y;
   }
 
-  /** Animate a Y-rotation on a pivot */
-  private animateRotation(pivot: THREE.Group, fromY: number, toY: number, ms: number): Promise<void> {
+  /** Animate a Z-rotation on a pivot (spin on the board plane) */
+  private animateRotation(pivot: THREE.Group, from: number, to: number, ms: number): Promise<void> {
     return new Promise(resolve => {
       const startTime = performance.now();
       const tick = () => {
         const t = Math.min((performance.now() - startTime) / ms, 1);
         const ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-        pivot.rotation.y = fromY + (toY - fromY) * ease;
+        pivot.rotation.z = from + (to - from) * ease;
         if (t < 1) requestAnimationFrame(tick);
         else resolve();
       };
@@ -203,7 +203,7 @@ export class ThreeOverlay {
         step++;
         if (step >= positions.length) {
           // Turn back to face camera
-          await this.animateRotation(pivot, pivot.rotation.y, 0, TURN_MS);
+          await this.animateRotation(pivot, pivot.rotation.z, 0, TURN_MS);
           resolve();
           return;
         }
@@ -213,12 +213,13 @@ export class ThreeOverlay {
         const endX = positions[step].x;
         const endY = positions[step].y;
 
-        // Rotate toward destination
+        // Rotate on Z to face destination on the board plane
         const dx = endX - startX;
         const dy = endY - startY;
-        const turnAngle = -Math.atan2(dx, dy);
+        // atan2(-dx, dy) gives angle from +Y (up/north) rotating clockwise
+        const turnAngle = Math.atan2(-dx, dy);
 
-        await this.animateRotation(pivot, pivot.rotation.y, turnAngle, TURN_MS);
+        await this.animateRotation(pivot, pivot.rotation.z, turnAngle, TURN_MS);
 
         // Move
         await new Promise<void>(moveResolve => {
