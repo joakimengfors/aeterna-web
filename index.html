@@ -137,6 +137,24 @@
         }
 
         .hex-token { pointer-events: none; }
+        .hex-token.token-spawn {
+            animation: token-spawn 0.7s ease-out forwards;
+        }
+        @keyframes token-spawn {
+            0% { opacity: 0; transform: translate(var(--tx), var(--ty)) scale(0.2); }
+            50% { opacity: 1; transform: translate(var(--tx), var(--ty)) scale(1.18); }
+            75% { transform: translate(var(--tx), var(--ty)) scale(0.95); }
+            100% { opacity: 1; transform: translate(var(--tx), var(--ty)) scale(1); }
+        }
+        .token-standee.token-spawn {
+            animation: standee-spawn 0.7s ease-out forwards;
+        }
+        @keyframes standee-spawn {
+            0% { opacity: 0; transform: translate(-50%, -50%) rotateX(-32deg) scale(0.2); }
+            50% { opacity: 1; transform: translate(-50%, -50%) rotateX(-32deg) scale(1.18); }
+            75% { transform: translate(-50%, -50%) rotateX(-32deg) scale(0.95); }
+            100% { opacity: 1; transform: translate(-50%, -50%) rotateX(-32deg) scale(1); }
+        }
 
         /* Standee overlay - sits on top of SVG, same coordinate space */
         .standee-overlay {

@@ -13,7 +13,7 @@ import { TopBar } from './TopBar';
 import { GameDialog } from './GameDialog';
 import type { ActionId, HexId, ElementalType } from '../game/types';
 import { getActionsForElemental } from '../game/types';
-import { getNeighbors, getLineHexes, isShore, ALL_HEX_IDS } from '../game/HexGrid';
+import { getNeighbors, getLineHexes, isShore, ALL_HEX_IDS, getShortestPath, getPixelPos } from '../game/HexGrid';
 
 const NAMES: Record<ElementalType, string> = { earth: 'Kaijom', water: 'Nitsuji', fire: 'Krakatoa' };
 
@@ -60,6 +60,9 @@ export class HexInteraction {
   // Mosey fog fix: save water hex before action execution
   private waterHexBeforeMosey: HexId | null = null;
 
+  // Animation: pending move animation to play after render
+  private pendingAnimation: { type: ElementalType | 'minion'; path: HexId[] } | null = null;
+
   constructor(
     state: GameState,
     board: BoardRenderer,
@@ -77,6 +80,83 @@ export class HexInteraction {
 
     this.board.setHexClickHandler((hexId) => this.onHexClick(hexId));
     this.showTurnBanner(() => this.renderAll());
+  }
+
+  /** Queue a movement animation to play after the next board.render() call */
+  private queueMoveAnimation(type: ElementalType | 'minion', fromHex: HexId, toHex: HexId, action?: ActionId) {
+    if (fromHex === toHex) return;
+
+    let path: HexId[];
+
+    // Straight-line actions: compute the line path
+    if (action === 'smoke-dash' || action === 'flame-dash') {
+      const lines = getLineHexes(fromHex, 4);
+      const line = lines.find(l => l.hexes.includes(toHex));
+      if (line) {
+        const idx = line.hexes.indexOf(toHex);
+        path = [fromHex, ...line.hexes.slice(0, idx + 1)];
+      } else {
+        path = [fromHex, toHex];
+      }
+    }
+    // BFS-based movement: compute shortest path through walkable hexes
+    else if (action === 'uproot' || action === 'landslide' || action === 'firestorm') {
+      const bfsPath = getShortestPath(fromHex, toHex, (h) => {
+        // Allow passing through any hex that isn't blocked
+        const hex = this.state.getHex(h);
+        if (type === 'minion') return true;
+        if (hex.tokens.includes('fire') && type === 'earth') return false;
+        return true;
+      });
+      path = [fromHex, ...bfsPath];
+    }
+    // 1-hex moves or teleports: just direct
+    else {
+      path = [fromHex, toHex];
+    }
+
+    this.pendingAnimation = { type, path };
+  }
+
+  /** Queue animation based on action type and targets */
+  private queueMoveAnimationForAction(action: ActionId, targets: HexId[]) {
+    const moveTarget = targets[0];
+    switch (action) {
+      case 'uproot':
+      case 'landslide':
+      case 'raise-mountain': {
+        const earth = this.state.getPlayer('earth');
+        this.queueMoveAnimation('earth', earth.hexId, moveTarget, action);
+        break;
+      }
+      case 'mosey':
+      case 'surf':
+      case 'rematerialize': {
+        const water = this.state.getPlayer('water');
+        this.queueMoveAnimation('water', water.hexId, moveTarget, action);
+        break;
+      }
+      case 'smoke-dash': {
+        const fire = this.state.getPlayer('fire');
+        this.queueMoveAnimation('fire', fire.hexId, moveTarget, action);
+        break;
+      }
+      case 'firestorm': {
+        // Last target is the move hex
+        const fire = this.state.getPlayer('fire');
+        const fireMoveTarget = targets[targets.length - 1];
+        this.queueMoveAnimation('fire', fire.hexId, fireMoveTarget, action);
+        break;
+      }
+    }
+  }
+
+  /** Play any pending animation. Returns a promise that resolves when done. */
+  private async playPendingAnimation(): Promise<void> {
+    if (!this.pendingAnimation) return;
+    const { type, path } = this.pendingAnimation;
+    this.pendingAnimation = null;
+    await this.board.animateStandee(type, path);
   }
 
   private renderAll() {
@@ -445,17 +525,25 @@ export class HexInteraction {
         `Execute <strong>Start of Turn</strong> ability?`,
         () => {
           this.dialog.hide();
+          // Queue SOT movement animation
+          const type = this.state.currentPlayer;
+          if (type === 'earth') {
+            const minionHex = this.state.getStoneMinionHex();
+            if (minionHex !== null) this.queueMoveAnimation('minion', minionHex, hexId);
+          } else if (type === 'water') {
+            const water = this.state.getPlayer('water');
+            this.queueMoveAnimation('water', water.hexId, hexId);
+          }
           this.executor.executeSOT(hexId);
           this.checkWin();
-
-          if (this.state.pendingForcedMove) {
-            this.startForcedMovePhase(() => {
-              this.finishSOT();
-            });
-            return;
-          }
-
-          this.finishSOT();
+          this.board.render(this.state);
+          this.playPendingAnimation().then(() => {
+            if (this.state.pendingForcedMove) {
+              this.startForcedMovePhase(() => this.finishSOT());
+              return;
+            }
+            this.finishSOT();
+          });
         },
         () => this.onUndo(),
       );
@@ -529,9 +617,10 @@ export class HexInteraction {
         this.topBar.render(this.state);
         this.dialog.showInfo('Raise Mountain', instruction, () => this.onUndo());
       } else {
-        // Step 0 was move — apply movement
+        // Step 0 was move — apply movement with animation
         const earth = this.state.getPlayer('earth');
         if (hexId !== earth.hexId) {
+          this.queueMoveAnimation('earth', earth.hexId, hexId);
           this.executor.handleEarthConversion(hexId);
           this.state.setElementalOnHex(hexId, 'earth');
         }
@@ -541,17 +630,20 @@ export class HexInteraction {
         this.validTargets = targets;
         this.state.stepInstruction = instruction;
         this.board.render(this.state);
-        this.board.highlightValidTargets(targets, this.state.currentPlayer);
-        this.topBar.render(this.state);
-        this.dialog.showInfo('Raise Mountain', instruction, () => this.onUndo());
+        this.playPendingAnimation().then(() => {
+          this.board.highlightValidTargets(targets, this.state.currentPlayer);
+          this.topBar.render(this.state);
+          this.dialog.showInfo('Raise Mountain', instruction, () => this.onUndo());
+        });
       }
     } else {
       this.actionTargets.push(hexId);
 
       if (this.raiseMountainPlaceFirst) {
-        // Step 1 was move — apply movement
+        // Step 1 was move — apply movement with animation
         const earth = this.state.getPlayer('earth');
         if (hexId !== earth.hexId) {
+          this.queueMoveAnimation('earth', earth.hexId, hexId);
           this.executor.handleEarthConversion(hexId);
           this.state.setElementalOnHex(hexId, 'earth');
         }
@@ -562,9 +654,11 @@ export class HexInteraction {
 
       this.state.phase = 'CONFIRM';
       this.board.render(this.state);
-      this.board.highlightSelected(hexId);
-      this.topBar.render(this.state);
-      this.showConfirmDialog();
+      this.playPendingAnimation().then(() => {
+        this.board.highlightSelected(hexId);
+        this.topBar.render(this.state);
+        this.showConfirmDialog();
+      });
     }
   }
 
@@ -575,24 +669,27 @@ export class HexInteraction {
 
       const earth = this.state.getPlayer('earth');
       if (hexId !== earth.hexId) {
+        this.queueMoveAnimation('earth', earth.hexId, hexId, 'landslide');
         this.executor.handleEarthConversion(hexId);
         this.state.setElementalOnHex(hexId, 'earth');
       }
 
-      const targets = this.executor.getLandslideDestroyTargets();
-      if (targets.length === 0) {
-        this.state.phase = 'CONFIRM';
-        this.topBar.render(this.state);
-        this.showConfirmDialog();
-        return;
-      }
+      this.board.render(this.state);
+      this.playPendingAnimation().then(() => {
+        const targets = this.executor.getLandslideDestroyTargets();
+        if (targets.length === 0) {
+          this.state.phase = 'CONFIRM';
+          this.topBar.render(this.state);
+          this.showConfirmDialog();
+          return;
+        }
 
-      this.dialog.showChoice('Landslide', 'Destroy a Mountain?', [
-        { text: 'Choose a Mountain', callback: () => {
-          this.state.stepInstruction = 'Choose a Mountain to destroy';
-          this.validTargets = targets;
-          this.board.render(this.state);
-          this.board.highlightValidTargets(targets, this.state.currentPlayer);
+        this.dialog.showChoice('Landslide', 'Destroy a Mountain?', [
+          { text: 'Choose a Mountain', callback: () => {
+            this.state.stepInstruction = 'Choose a Mountain to destroy';
+            this.validTargets = targets;
+            this.board.render(this.state);
+            this.board.highlightValidTargets(targets, this.state.currentPlayer);
           this.topBar.render(this.state);
 
           for (const mt of targets) {
@@ -609,7 +706,8 @@ export class HexInteraction {
           this.topBar.render(this.state);
           this.showConfirmDialog();
         }},
-      ]);
+        ]);
+      });
     } else {
       this.actionTargets.push(hexId);
       this.state.phase = 'CONFIRM';
@@ -814,9 +912,48 @@ export class HexInteraction {
 
   private handleFogMoveClick(hexId: HexId) {
     const fogHex = this.pendingFogMoves.shift()!;
-    this.executor.moveFog(fogHex, hexId);
-    this.checkWin();
-    this.promptNextFogMove();
+
+    if (fogHex !== hexId) {
+      // Animate fog token before updating state
+      const fromPos = getPixelPos(fogHex);
+      const toPos = getPixelPos(hexId);
+      const fromLeft = `${(fromPos.x / 628) * 100}%`;
+      const fromTop = `${(fromPos.y / 700) * 100}%`;
+      const targetLeft = `${(toPos.x / 628) * 100}%`;
+      const targetTop = `${(toPos.y / 700) * 100}%`;
+
+      // Find the fog standee at the old position
+      const container = this.board.getStandeeContainer();
+      const fogEls = container.querySelectorAll('.token-standee-fog') as NodeListOf<HTMLElement>;
+      let fogEl: HTMLElement | null = null;
+      // Use data attribute for reliable matching
+      for (const el of fogEls) {
+        if (el.getAttribute('data-hex') === String(fogHex)) {
+          fogEl = el;
+          break;
+        }
+      }
+
+      if (fogEl) {
+        fogEl.style.transition = 'left 350ms ease-in-out, top 350ms ease-in-out';
+        fogEl.style.left = targetLeft;
+        fogEl.style.top = targetTop;
+
+        setTimeout(() => {
+          this.executor.moveFog(fogHex, hexId);
+          this.checkWin();
+          this.promptNextFogMove();
+        }, 360);
+      } else {
+        this.executor.moveFog(fogHex, hexId);
+        this.checkWin();
+        this.promptNextFogMove();
+      }
+    } else {
+      this.executor.moveFog(fogHex, hexId);
+      this.checkWin();
+      this.promptNextFogMove();
+    }
   }
 
   // ==========================================
@@ -841,11 +978,16 @@ export class HexInteraction {
   }
 
   private handleForcedMoveClick(hexId: HexId) {
+    const earth = this.state.getPlayer('earth');
+    this.queueMoveAnimation('earth', earth.hexId, hexId);
     this.executor.executeForcedMove(hexId);
     this.checkWin();
-    const cb = this.postForcedMoveCallback;
-    this.postForcedMoveCallback = null;
-    if (cb) cb();
+    this.board.render(this.state);
+    this.playPendingAnimation().then(() => {
+      const cb = this.postForcedMoveCallback;
+      this.postForcedMoveCallback = null;
+      if (cb) cb();
+    });
   }
 
   // ==========================================
@@ -858,21 +1000,22 @@ export class HexInteraction {
     if (this.state.phase === 'CONFIRM' && this.selectedAction) {
       // Flame Dash special handling
       if (this.selectedAction === 'flame-dash') {
+        const fire = this.state.getPlayer('fire');
         const targetHex = this.actionTargets[0];
+        this.queueMoveAnimation('fire', fire.hexId, targetHex, 'flame-dash');
         const placeOnDest = !this.flameDashPlacedFirst;
         const result = this.executor.executeFlameDashMove(targetHex, placeOnDest);
         this.state.addLog(result);
         this.turnMgr.setActionMarker(this.selectedAction);
         this.checkWin();
-
-        if (this.state.pendingForcedMove) {
-          this.startForcedMovePhase(() => {
-            this.finishTurn();
-          });
-          return;
-        }
-
-        this.finishTurn();
+        this.board.render(this.state);
+        this.playPendingAnimation().then(() => {
+          if (this.state.pendingForcedMove) {
+            this.startForcedMovePhase(() => this.finishTurn());
+            return;
+          }
+          this.finishTurn();
+        });
         return;
       }
 
@@ -904,21 +1047,25 @@ export class HexInteraction {
         this.waterHexBeforeMosey = water.hexId;
       }
 
+      // Queue movement animation before executing
+      this.queueMoveAnimationForAction(this.selectedAction, this.actionTargets);
+
       // Execute the action
       const result = this.executor.executeAction(this.selectedAction, this.actionTargets);
       this.state.addLog(result);
       this.turnMgr.setActionMarker(this.selectedAction);
 
       this.checkWin();
-
-      if (this.state.pendingForcedMove) {
-        this.startForcedMovePhase(() => {
-          this.finishActionWithFogCheck();
-        });
-        return;
-      }
-
-      this.finishActionWithFogCheck();
+      this.board.render(this.state);
+      this.playPendingAnimation().then(() => {
+        if (this.state.pendingForcedMove) {
+          this.startForcedMovePhase(() => {
+            this.finishActionWithFogCheck();
+          });
+          return;
+        }
+        this.finishActionWithFogCheck();
+      });
     } else if (this.state.phase === 'EXECUTING' && this.selectedAction === 'landslide' && this.currentStep === 1) {
       this.state.phase = 'CONFIRM';
       this.onConfirm();

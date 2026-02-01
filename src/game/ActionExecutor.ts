@@ -685,18 +685,18 @@ export class ActionExecutor {
     const moveTarget = targets[targets.length - 1];
     const placed = targets.slice(0, -1);
 
-    // Check if any placed fire is on Earth's hex
+    // Move FIRST (before checking forced Earth move)
+    if (moveTarget !== undefined && moveTarget !== this.state.getPlayer('fire').hexId) {
+      this.handleFireConversion(moveTarget);
+      this.state.setElementalOnHex(moveTarget, 'fire');
+    }
+
+    // THEN check if any placed fire is on Earth's hex (forced move happens after Fire moves)
     const earth = this.state.getPlayer('earth');
     for (const hex of placed) {
       if (hex === earth.hexId) {
         this.handleFireOnEarth();
       }
-    }
-
-    // Move
-    if (moveTarget !== undefined && moveTarget !== this.state.getPlayer('fire').hexId) {
-      this.handleFireConversion(moveTarget);
-      this.state.setElementalOnHex(moveTarget, 'fire');
     }
 
     return `Firestorm — placed Fire on ${placed.join(', ')}${moveTarget && moveTarget !== this.state.getPlayer('fire').hexId ? `, moved to ${moveTarget}` : ''}`;

@@ -36,6 +36,10 @@ export class BoardRenderer {
   private highlightLayer!: SVGGElement;
   private standeeContainer!: HTMLElement;
   private onHexClick: ((hexId: HexId) => void) | null = null;
+  // Track tokens per hex for spawn animation detection
+  private previousTokens: Map<HexId, string[]> = new Map();
+  // Track recently spawned tokens so re-renders within animation window still animate
+  private spawnedTokens: Map<string, number> = new Map(); // "hexId:token" -> timestamp
 
   constructor(private container: HTMLElement) {
     this.createSVG();
@@ -100,6 +104,10 @@ export class BoardRenderer {
     }
   }
 
+  getStandeeContainer(): HTMLElement {
+    return this.standeeContainer;
+  }
+
   setHexClickHandler(handler: (hexId: HexId) => void) {
     this.onHexClick = handler;
   }
@@ -114,20 +122,36 @@ export class BoardRenderer {
     // Clear standing token containers (fog/mountain go in standee overlay)
     this.standeeContainer.querySelectorAll('.token-standee').forEach(el => el.remove());
 
+    const newTokens = new Map<HexId, string[]>();
+
     for (const id of ALL_HEX_IDS) {
       const hex = state.getHex(id);
       const pos = getPixelPos(id);
+      newTokens.set(id, [...hex.tokens]);
+      const prevTokens = this.previousTokens.get(id) ?? [];
 
       for (const token of hex.tokens) {
+        const spawnKey = `${id}:${token}`;
+        const spawnTime = this.spawnedTokens.get(spawnKey);
+        const isNew = !prevTokens.includes(token) || (spawnTime !== undefined && Date.now() - spawnTime < 700);
+        if (isNew && !spawnTime) {
+          this.spawnedTokens.set(spawnKey, Date.now());
+        }
+
         // Fog and mountain render as standing pieces in HTML overlay
         if (token === 'fog' || token === 'mountain') {
-          this.renderTokenStandee(token, pos, id, hex.tokens);
+          this.renderTokenStandee(token, pos, id, hex.tokens, isNew);
           continue;
         }
 
         const img = document.createElementNS('http://www.w3.org/2000/svg', 'image');
         img.setAttribute('href', TOKEN_IMAGES[token]);
         img.classList.add('hex-token');
+        if (isNew) {
+          img.classList.add('token-spawn');
+          img.style.setProperty('--tx', `${pos.x}px`);
+          img.style.setProperty('--ty', `${pos.y}px`);
+        }
 
         const size = token === 'fire' ? 50.4 : 57.6;
         const half = size / 2;
@@ -135,15 +159,25 @@ export class BoardRenderer {
         img.setAttribute('y', String(-half));
         img.setAttribute('width', String(size));
         img.setAttribute('height', String(size));
-        img.setAttribute('transform', `translate(${pos.x},${pos.y})`);
+        if (!isNew) {
+          img.setAttribute('transform', `translate(${pos.x},${pos.y})`);
+        }
         img.setAttribute('clip-path', token === 'fire' ? 'url(#clip-token-md)' : 'url(#clip-token-lg)');
 
         this.tokenLayer.appendChild(img);
       }
     }
+
+    // Clean up expired spawn entries
+    const now = Date.now();
+    for (const [key, time] of this.spawnedTokens) {
+      if (now - time >= 700) this.spawnedTokens.delete(key);
+    }
+
+    this.previousTokens = newTokens;
   }
 
-  private renderTokenStandee(token: TokenType, pos: { x: number; y: number }, hexId: HexId, allTokens: TokenType[]) {
+  private renderTokenStandee(token: TokenType, pos: { x: number; y: number }, hexId: HexId, allTokens: TokenType[], isNew: boolean) {
     // Shadow on the board (SVG)
     const shadow = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
     const isFog = token === 'fog';
@@ -161,6 +195,8 @@ export class BoardRenderer {
     // HTML standing piece
     const el = document.createElement('div');
     el.className = `standee-3d token-standee token-standee-${token}`;
+    el.setAttribute('data-hex', String(hexId));
+    if (isNew) el.classList.add('token-spawn');
     el.style.left = `${((pos.x + offsetX) / 628) * 100}%`;
     el.style.top = `${(pos.y / 700) * 100}%`;
 
@@ -306,6 +342,53 @@ export class BoardRenderer {
       g.classList.remove('valid-target', 'dimmed');
       g.classList.add('selected');
     }
+  }
+
+  /**
+   * Animate a standee (elemental or minion) along a path of hex IDs.
+   * Returns a promise that resolves when the animation is complete.
+   */
+  animateStandee(type: ElementalType | 'minion', path: HexId[]): Promise<void> {
+    if (path.length === 0) return Promise.resolve();
+
+    const selector = type === 'minion' ? '.standee-minion' : `.standee-${type}`;
+    const el = this.standeeContainer.querySelector(selector) as HTMLElement | null;
+    if (!el) return Promise.resolve();
+
+    const positions = path.map(hexId => {
+      const pos = getPixelPos(hexId);
+      return {
+        left: `${(pos.x / 628) * 100}%`,
+        top: `${(pos.y / 700) * 100}%`,
+      };
+    });
+
+    const MS_PER_HEX = 260;
+
+    return new Promise(resolve => {
+      let step = 0;
+
+      // Position at first waypoint
+      el.style.transition = 'none';
+      el.style.left = positions[0].left;
+      el.style.top = positions[0].top;
+      el.offsetHeight; // force reflow
+
+      const advance = () => {
+        step++;
+        if (step >= positions.length) {
+          el.style.transition = '';
+          resolve();
+          return;
+        }
+        el.style.transition = `left ${MS_PER_HEX}ms ease-in-out, top ${MS_PER_HEX}ms ease-in-out`;
+        el.style.left = positions[step].left;
+        el.style.top = positions[step].top;
+        setTimeout(advance, MS_PER_HEX);
+      };
+
+      advance();
+    });
   }
 
   highlightDanger(hexIds: HexId[]) {

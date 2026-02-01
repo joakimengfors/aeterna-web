@@ -212,6 +212,39 @@ export function getReachableHexes(
   return reachable;
 }
 
+/** BFS shortest path from start to end. Returns array of hex IDs (excluding start, including end). */
+export function getShortestPath(
+  start: HexId,
+  end: HexId,
+  canEnter: (hexId: HexId) => boolean,
+): HexId[] {
+  if (start === end) return [];
+  const parent = new Map<HexId, HexId>();
+  const queue: HexId[] = [start];
+  parent.set(start, start);
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    for (const neighbor of getNeighbors(current)) {
+      if (parent.has(neighbor)) continue;
+      if (neighbor !== end && !canEnter(neighbor)) continue;
+      parent.set(neighbor, current);
+      if (neighbor === end) {
+        // Reconstruct path
+        const path: HexId[] = [];
+        let node = end;
+        while (node !== start) {
+          path.unshift(node);
+          node = parent.get(node)!;
+        }
+        return path;
+      }
+      queue.push(neighbor);
+    }
+  }
+  return [end]; // Fallback: direct jump (teleport)
+}
+
 /** Get all hexes in the 6 straight-line directions from a hex, up to `range` hexes. */
 export function getLineHexes(from: HexId, range: number): { direction: HexCoord; hexes: HexId[] }[] {
   const result: { direction: HexCoord; hexes: HexId[] }[] = [];
