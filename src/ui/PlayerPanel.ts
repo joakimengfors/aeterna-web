@@ -142,10 +142,11 @@ export class PlayerPanel {
     const chips: string[] = [];
     for (const [token, count] of Object.entries(supplies)) {
       const max = this.getMaxSupply(token);
+      const onBoard = max - count;
       chips.push(`
         <div class="token-chip">
           <span class="token-dot ${token}"></span>
-          ${count} / ${max} ${token.charAt(0).toUpperCase() + token.slice(1)}
+          ${onBoard} / ${max} ${token.charAt(0).toUpperCase() + token.slice(1)}
         </div>
       `);
     }
