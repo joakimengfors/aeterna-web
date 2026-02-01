@@ -5,6 +5,7 @@
 import type { GameState } from '../game/GameState';
 import type { HexId, ElementalType, TokenType } from '../game/types';
 import { ALL_HEX_IDS, getPixelPos, isShore } from '../game/HexGrid';
+import { ThreeOverlay } from './ThreeOverlay';
 
 const HEX_POINTS = '0,-45.5 39.4,-22.7 39.4,22.7 0,45.5 -39.4,22.7 -39.4,-22.8';
 
@@ -35,6 +36,7 @@ export class BoardRenderer {
   private standeeLayer!: SVGGElement;
   private highlightLayer!: SVGGElement;
   private standeeContainer!: HTMLElement;
+  private threeOverlay!: ThreeOverlay;
   private onHexClick: ((hexId: HexId) => void) | null = null;
   // Track tokens per hex for spawn animation detection
   private previousTokens: Map<HexId, string[]> = new Map();
@@ -101,6 +103,12 @@ export class BoardRenderer {
 
       hexLayer.appendChild(g);
       this.hexElements.set(id, g);
+    }
+
+    // Initialize Three.js overlay for 3D models
+    const mapContainer = this.container.querySelector('.map-container') as HTMLElement;
+    if (mapContainer) {
+      this.threeOverlay = new ThreeOverlay(mapContainer);
     }
   }
 
@@ -246,7 +254,13 @@ export class BoardRenderer {
       shadow.style.pointerEvents = 'none';
       this.standeeLayer.appendChild(shadow);
 
-      // HTML standee
+      // Use 3D model if available
+      if (this.threeOverlay?.hasModel(type)) {
+        this.threeOverlay.setPosition(type, player.hexId);
+        continue;
+      }
+
+      // HTML standee fallback
       const el = document.createElement('div');
       el.className = `standee-3d standee-${type}`;
       el.style.left = `${(pos.x / 628) * 100}%`;
@@ -350,6 +364,11 @@ export class BoardRenderer {
    */
   animateStandee(type: ElementalType | 'minion', path: HexId[]): Promise<void> {
     if (path.length === 0) return Promise.resolve();
+
+    // Use Three.js animation for 3D models
+    if (type !== 'minion' && this.threeOverlay?.hasModel(type)) {
+      return this.threeOverlay.animateAlongPath(type, path);
+    }
 
     const selector = type === 'minion' ? '.standee-minion' : `.standee-${type}`;
     const el = this.standeeContainer.querySelector(selector) as HTMLElement | null;
