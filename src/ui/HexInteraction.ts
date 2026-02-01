@@ -102,10 +102,19 @@ export class HexInteraction {
     // BFS-based movement: compute shortest path through walkable hexes
     else if (action === 'uproot' || action === 'landslide' || action === 'firestorm') {
       const bfsPath = getShortestPath(fromHex, toHex, (h) => {
-        // Allow passing through any hex that isn't blocked
         const hex = this.state.getHex(h);
         if (type === 'minion') return true;
-        if (hex.tokens.includes('fire') && type === 'earth') return false;
+        if (type === 'earth') {
+          if (hex.tokens.includes('fire')) return false;
+          if (hex.tokens.includes('mountain')) return false;
+        }
+        if (type === 'fire') {
+          if (hex.tokens.includes('mountain')) return false;
+          if (hex.tokens.includes('lake')) return false;
+        }
+        if (type === 'water') {
+          if (hex.tokens.includes('mountain')) return false;
+        }
         return true;
       });
       path = [fromHex, ...bfsPath];
