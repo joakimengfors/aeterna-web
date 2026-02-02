@@ -9,7 +9,7 @@ interface Env {
 }
 
 function generateRoomCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no I/O/0/1 for clarity
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let code = '';
   for (let i = 0; i < 6; i++) {
     code += chars[Math.floor(Math.random() * chars.length)];
@@ -17,14 +17,22 @@ function generateRoomCode(): string {
   return code;
 }
 
-// --- Worker entry point ---
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
+    // CORS preflight
+    if (request.method === 'OPTIONS') {
+      return new Response(null, {
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, OPTIONS',
+          'Access-Control-Allow-Headers': '*',
+        },
+      });
+    }
+
     if (url.pathname === '/ws') {
-      // Route to a room Durable Object
-      // Room code comes as a query param for joining, or we create one
       const code = url.searchParams.get('code');
       const action = url.searchParams.get('action') || 'join';
 
@@ -47,12 +55,15 @@ export default {
       return room.fetch(new Request(newUrl.toString(), request));
     }
 
-    // Health check
     if (url.pathname === '/health') {
-      return new Response('ok');
+      return new Response('ok', {
+        headers: { 'Access-Control-Allow-Origin': '*' },
+      });
     }
 
-    return new Response('Aeterna Signaling Server', { status: 200 });
+    return new Response('Aeterna Signaling Server', {
+      headers: { 'Access-Control-Allow-Origin': '*' },
+    });
   },
 };
 
@@ -65,16 +76,12 @@ interface RoomPlayer {
 }
 
 export class GameRoom {
-  private state: DurableObjectState;
   private players: Map<string, RoomPlayer> = new Map();
-  private hostId: string = '';
-  private roomCode: string = '';
+  private hostId = '';
+  private roomCode = '';
   private started = false;
-  private lastActivity = Date.now();
 
-  constructor(state: DurableObjectState, env: Env) {
-    this.state = state;
-  }
+  constructor(private state: DurableObjectState, private env: Env) {}
 
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
@@ -88,21 +95,16 @@ export class GameRoom {
 
     const pair = new WebSocketPair();
     const [client, server] = [pair[0], pair[1]];
+    server.accept();
 
     const playerId = crypto.randomUUID().slice(0, 8);
 
-    this.state.acceptWebSocket(server);
-
-    this.lastActivity = Date.now();
-
-    // Handle messages
     server.addEventListener('message', (event) => {
-      this.lastActivity = Date.now();
       try {
         const msg = JSON.parse(event.data as string);
         this.handleMessage(playerId, msg);
       } catch (e) {
-        // ignore parse errors
+        // ignore
       }
     });
 
@@ -114,7 +116,6 @@ export class GameRoom {
       this.handleDisconnect(playerId);
     });
 
-    // Register player
     const player: RoomPlayer = { ws: server, id: playerId, elemental: null };
 
     if (action === 'create') {
@@ -122,14 +123,12 @@ export class GameRoom {
       this.players.set(playerId, player);
       this.started = false;
 
-      // Send room-created
       this.sendTo(playerId, {
         type: 'room-created',
         code: this.roomCode,
         hostId: playerId,
       });
     } else {
-      // Joining
       if (this.players.size >= 3) {
         this.sendToWs(server, { type: 'error', message: 'Room is full' });
         server.close(1000, 'Room full');
@@ -144,7 +143,6 @@ export class GameRoom {
 
       this.players.set(playerId, player);
 
-      // Send room-joined to new player
       const existingPlayers = Array.from(this.players.values()).map(p => ({
         id: p.id,
         elemental: p.elemental,
@@ -157,7 +155,6 @@ export class GameRoom {
         players: existingPlayers,
       });
 
-      // Notify existing players
       this.broadcast({
         type: 'player-joined',
         playerId,
@@ -165,16 +162,12 @@ export class GameRoom {
       }, playerId);
     }
 
-    // Auto-expire after 30 min idle
-    this.scheduleExpiry();
-
     return new Response(null, { status: 101, webSocket: client });
   }
 
   private handleMessage(fromId: string, msg: any) {
     switch (msg.type) {
-      case 'signal':
-        // Relay WebRTC signaling to target peer
+      case 'signal': {
         const target = this.players.get(msg.to);
         if (target) {
           this.sendToWs(target.ws, {
@@ -185,12 +178,12 @@ export class GameRoom {
           });
         }
         break;
+      }
 
       case 'pick-elemental': {
         const player = this.players.get(fromId);
         if (!player) return;
 
-        // Check if elemental is already taken
         const taken = new Set(
           Array.from(this.players.values())
             .filter(p => p.id !== fromId && p.elemental)
@@ -204,7 +197,6 @@ export class GameRoom {
 
         player.elemental = msg.elemental;
 
-        // Broadcast pick to all
         this.broadcast({
           type: 'elemental-picked',
           playerId: fromId,
@@ -216,36 +208,25 @@ export class GameRoom {
       case 'start-game':
         if (fromId !== this.hostId) return;
         this.started = true;
-        // Game start is handled via WebRTC data channels, not through signaling
         break;
     }
   }
 
   private handleDisconnect(playerId: string) {
     this.players.delete(playerId);
-    this.broadcast({
-      type: 'player-left',
-      playerId,
-    });
-
-    // If no players left, clean up
-    if (this.players.size === 0) {
-      // Room will be garbage collected
-    }
+    this.broadcast({ type: 'player-left', playerId });
   }
 
   private sendTo(playerId: string, msg: any) {
     const player = this.players.get(playerId);
-    if (player) {
-      this.sendToWs(player.ws, msg);
-    }
+    if (player) this.sendToWs(player.ws, msg);
   }
 
   private sendToWs(ws: WebSocket, msg: any) {
     try {
       ws.send(JSON.stringify(msg));
     } catch (e) {
-      // Connection may be closed
+      // Connection closed
     }
   }
 
@@ -254,20 +235,5 @@ export class GameRoom {
       if (id === excludeId) continue;
       this.sendToWs(player.ws, msg);
     }
-  }
-
-  private scheduleExpiry() {
-    // Durable Objects auto-evict after inactivity.
-    // The 30-min idle timeout is handled by checking lastActivity
-    // on each message. In practice, the DO will be evicted by the runtime.
-  }
-
-  // Required for Durable Object WebSocket hibernation
-  async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer) {
-    // Handled by addEventListener above
-  }
-
-  async webSocketClose(ws: WebSocket, code: number, reason: string, wasClean: boolean) {
-    // Handled by addEventListener above
   }
 }

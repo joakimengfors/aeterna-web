@@ -14,7 +14,7 @@ import type { ElementalType } from './game/types';
 import './assets/styles.css';
 
 // Default signaling server URL — override via ?server= query param
-const DEFAULT_SIGNALING_URL = 'wss://aeterna-signaling.YOUR_WORKER.workers.dev';
+const DEFAULT_SIGNALING_URL = 'wss://aeterna-signaling.joakim-engfors.workers.dev';
 
 function getSignalingUrl(): string {
   const params = new URLSearchParams(window.location.search);
