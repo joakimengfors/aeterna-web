@@ -27,6 +27,13 @@ bun run preview
 - All styles: `src/assets/styles.css` + inline in `index.html`
 - Assets (images): `public/assets/`
 
+## Deployment
+
+- **Live site**: https://aeterna-541.pages.dev/ (Cloudflare Pages)
+- **Signaling server**: https://aeterna-signaling.joakim-engfors.workers.dev (Cloudflare Worker)
+- Build & deploy: `bun run build && bun x wrangler@3 pages deploy dist --project-name aeterna --branch main --commit-dirty=true`
+- Note: Use wrangler@3 for Pages deploy (v4 has a silent output bug)
+
 ## Multiplayer
 
 - WebRTC peer-to-peer with Cloudflare Worker signaling
