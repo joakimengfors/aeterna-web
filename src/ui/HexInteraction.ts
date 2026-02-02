@@ -553,7 +553,7 @@ export class HexInteraction {
             this.queueMoveAnimation('water', water.hexId, hexId);
           }
           this.executor.executeSOT(hexId);
-          this.checkWin();
+          if (this.checkWin()) return;
           this.board.render(this.state);
           this.playPendingAnimation().then(() => {
             if (this.state.pendingForcedMove) {
@@ -940,13 +940,13 @@ export class HexInteraction {
       // Animate fog token before updating state
       this.board.animateTokenMove('fog', fogHex, hexId).then(() => {
         this.executor.moveFog(fogHex, hexId);
-        this.checkWin();
+        if (this.checkWin()) return;
         this.renderAll();
         this.promptNextFogMove();
       });
     } else {
       this.executor.moveFog(fogHex, hexId);
-      this.checkWin();
+      if (this.checkWin()) return;
       this.promptNextFogMove();
     }
   }
@@ -976,7 +976,7 @@ export class HexInteraction {
     const earth = this.state.getPlayer('earth');
     this.queueMoveAnimation('earth', earth.hexId, hexId);
     this.executor.executeForcedMove(hexId);
-    this.checkWin();
+    if (this.checkWin()) return;
     this.board.render(this.state);
     this.playPendingAnimation().then(() => {
       const cb = this.postForcedMoveCallback;
@@ -1002,7 +1002,7 @@ export class HexInteraction {
         const result = this.executor.executeFlameDashMove(targetHex, placeOnDest);
         this.state.addLog(result);
         this.turnMgr.setActionMarker(this.selectedAction);
-        this.checkWin();
+        if (this.checkWin()) return;
         this.board.render(this.state);
         this.playPendingAnimation().then(() => {
           if (this.state.pendingForcedMove) {
@@ -1054,7 +1054,7 @@ export class HexInteraction {
       this.state.addLog(result);
       this.turnMgr.setActionMarker(this.selectedAction);
 
-      this.checkWin();
+      if (this.checkWin()) return;
       this.board.render(this.state);
       this.playPendingAnimation().then(() => {
         if (this.state.pendingForcedMove) {
@@ -1218,12 +1218,17 @@ export class HexInteraction {
     }
   }
 
-  private checkWin() {
+  /** Check win conditions. Returns true if game is over. */
+  private checkWin(): boolean {
     const winner = checkWinConditions(this.state);
     if (winner) {
       this.state.winner = winner;
-      const names: Record<ElementalType, string> = { earth: 'Kaijom', water: 'Nitsuji', fire: 'Krakatoa' };
-      alert(`${names[winner]} wins!`);
+      this.board.render(this.state);
+      this.dialog.showVictory(this.state, () => {
+        window.location.reload();
+      });
+      return true;
     }
+    return false;
   }
 }

@@ -2,6 +2,7 @@
 // Game Dialog (Modal Overlays)
 // ========================================
 
+import type { GameState } from '../game/GameState';
 import type { ActionId, ElementalType } from '../game/types';
 
 const SOT_HTML: Record<ElementalType, string> = {
@@ -234,6 +235,101 @@ export class GameDialog {
       this.content.addEventListener('click', () => this.hide(), { once: true });
     }
     this.show();
+  }
+
+  showVictory(state: GameState, onRematch: () => void) {
+    this.cancelCallback = null;
+    const winner = state.winner!;
+    const names: Record<ElementalType, string> = { earth: 'Kaijom', water: 'Nitsuji', fire: 'Krakatoa' };
+    const portraits: Record<ElementalType, string> = {
+      earth: 'assets/characters/elementals_illustration (earth).png',
+      water: 'assets/characters/elementals_illustration (water).png',
+      fire: 'assets/characters/elementals_illustration (fire).png',
+    };
+
+    // Determine win reason
+    const reason = this.getWinReason(state, winner);
+
+    // Gather stats
+    const turns = state.turnNumber;
+    const totalMoves = state.log.length;
+    const tokenStats: Record<ElementalType, number> = { earth: 0, water: 0, fire: 0 };
+    for (const hex of state.board.values()) {
+      tokenStats.earth += hex.tokens.filter(t => t === 'forest' || t === 'mountain').length;
+      tokenStats.water += hex.tokens.filter(t => t === 'lake' || t === 'fog').length;
+      tokenStats.fire += hex.tokens.filter(t => t === 'fire').length;
+    }
+
+    this.content.innerHTML = `
+      <div class="dialog-header victory-header victory-header-${winner}">
+        <div class="dialog-title victory-title">Victory</div>
+      </div>
+      <div class="dialog-body victory-body">
+        <div class="victory-portrait">
+          <img src="${portraits[winner]}" alt="${names[winner]}">
+        </div>
+        <div class="victory-name">${names[winner]}</div>
+        <div class="victory-reason">${reason}</div>
+        <div class="victory-stats">
+          <div class="victory-stat">
+            <span class="victory-stat-value">${turns}</span>
+            <span class="victory-stat-label">Rounds</span>
+          </div>
+          <div class="victory-stat">
+            <span class="victory-stat-value">${totalMoves}</span>
+            <span class="victory-stat-label">Actions</span>
+          </div>
+          <div class="victory-stat">
+            <span class="victory-stat-value">${tokenStats.earth}</span>
+            <span class="victory-stat-label"><img class="token-inline" src="assets/tokens/forest-token.png"> <img class="token-inline" src="assets/tokens/mountain.png"></span>
+          </div>
+          <div class="victory-stat">
+            <span class="victory-stat-value">${tokenStats.water}</span>
+            <span class="victory-stat-label"><img class="token-inline" src="assets/tokens/lake-token.png"> <img class="token-inline" src="assets/tokens/fog.png"></span>
+          </div>
+          <div class="victory-stat">
+            <span class="victory-stat-value">${tokenStats.fire}</span>
+            <span class="victory-stat-label"><img class="token-inline" src="assets/tokens/fire-token.png"></span>
+          </div>
+        </div>
+      </div>
+      <div class="dialog-actions victory-actions">
+        <button class="dialog-btn dialog-btn-primary" data-idx="rematch">Rematch</button>
+      </div>
+    `;
+
+    this.content.querySelector('[data-idx="rematch"]')!.addEventListener('click', () => {
+      this.hide();
+      onRematch();
+    });
+
+    // Blocking overlay with backdrop
+    this.overlay.style.pointerEvents = '';
+    this.content.style.pointerEvents = '';
+    this.show();
+  }
+
+  private getWinReason(state: GameState, winner: ElementalType): string {
+    const earth = state.getPlayer('earth');
+    const water = state.getPlayer('water');
+    const fire = state.getPlayer('fire');
+    const minionHex = state.getStoneMinionHex();
+
+    if (winner === 'earth') {
+      if (earth.hexId === water.hexId) return 'Captured Nitsuji';
+      if (minionHex !== null && minionHex === water.hexId) return 'Stone Minion captured Nitsuji';
+      if (state.countTokensOnBoard('forest') >= 3) return 'Grew 3 Forests';
+    }
+    if (winner === 'water') {
+      if (water.hexId === fire.hexId) return 'Captured Krakatoa';
+      return 'Krakatoa was trapped';
+    }
+    if (winner === 'fire') {
+      if (fire.hexId === earth.hexId) return 'Captured Kaijom';
+      if (state.countTokensOnBoard('fire') >= 12) return 'Spread 12 Fire tokens';
+      return 'Kaijom was trapped';
+    }
+    return 'Victory';
   }
 
   private show() {
