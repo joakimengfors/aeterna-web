@@ -8,22 +8,129 @@ import { PlayerPanel } from './ui/PlayerPanel';
 import { TopBar } from './ui/TopBar';
 import { GameDialog } from './ui/GameDialog';
 import { HexInteraction } from './ui/HexInteraction';
+import { MainMenu } from './ui/MainMenu';
+import { NetworkController } from './network/NetworkController';
+import type { ElementalType } from './game/types';
 import './assets/styles.css';
 
+// Default signaling server URL — override via ?server= query param
+const DEFAULT_SIGNALING_URL = 'wss://aeterna-signaling.YOUR_WORKER.workers.dev';
+
+function getSignalingUrl(): string {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('server') || DEFAULT_SIGNALING_URL;
+}
+
 function init() {
-  const state = new GameState();
+  const menuEl = document.getElementById('main-menu')!;
+  const gameLayout = document.querySelector('.game-layout') as HTMLElement;
 
-  const topBarEl = document.getElementById('top-bar')!;
-  const leftPanelEl = document.getElementById('left-panel')!;
-  const mapAreaEl = document.getElementById('map-area')!;
+  let network: NetworkController | null = null;
 
-  const board = new BoardRenderer(mapAreaEl);
-  const playerPanel = new PlayerPanel(leftPanelEl);
-  const topBar = new TopBar(topBarEl);
-  const dialog = new GameDialog();
+  const menu = new MainMenu(menuEl, {
+    onLocalPlay: () => {
+      menu.hide();
+      gameLayout.style.display = '';
+      startLocalGame();
+    },
 
-  // Wire everything up through the interaction controller
-  new HexInteraction(state, board, playerPanel, topBar, dialog);
+    onHostGame: async () => {
+      try {
+        network = new NetworkController(getSignalingUrl(), 'host');
+        network.onLobbyUpdate((lobby) => {
+          menu.setLocalPlayerId(lobby.hostId);
+          menu.updateLobby(lobby);
+        });
+        network.onError((msg) => {
+          menu.showError(msg);
+        });
+        await network.createRoom();
+        menu.setScreen('host-lobby');
+      } catch (e) {
+        menu.showError('Failed to connect to server. Check your connection.');
+      }
+    },
+
+    onJoinGame: async (code: string) => {
+      try {
+        network = new NetworkController(getSignalingUrl(), 'guest');
+        network.onLobbyUpdate((lobby) => {
+          menu.setLocalPlayerId(network!.playerId);
+          menu.updateLobby(lobby);
+        });
+        network.onError((msg) => {
+          menu.showError(msg);
+        });
+        network.onGameStart((stateData, localElemental) => {
+          menu.hide();
+          gameLayout.style.display = '';
+          startMultiplayerGame(stateData, localElemental, network!);
+        });
+        await network.joinRoom(code);
+        menu.setScreen('join-lobby');
+      } catch (e) {
+        menu.showError('Failed to connect to server.');
+      }
+    },
+
+    onPickElemental: (elemental: ElementalType) => {
+      network?.pickElemental(elemental);
+    },
+
+    onStartGame: () => {
+      if (!network || !network.isHost || !network.lobby) return;
+      const lobby = network.lobby;
+      const assignments: Record<string, ElementalType> = {};
+      for (const p of lobby.players) {
+        if (p.elemental) assignments[p.id] = p.elemental;
+      }
+      if (Object.keys(assignments).length !== 3) return;
+
+      const state = new GameState();
+      state.localPlayer = assignments[lobby.hostId];
+      network.startGame(state, assignments);
+
+      menu.hide();
+      gameLayout.style.display = '';
+      startMultiplayerGame(GameState.toJSON(state), state.localPlayer!, network);
+    },
+
+    onBackToMenu: () => {
+      network?.close();
+      network = null;
+      menu.show();
+    },
+  });
+
+  function startLocalGame() {
+    const state = new GameState();
+    const topBarEl = document.getElementById('top-bar')!;
+    const leftPanelEl = document.getElementById('left-panel')!;
+    const mapAreaEl = document.getElementById('map-area')!;
+
+    const board = new BoardRenderer(mapAreaEl);
+    const playerPanel = new PlayerPanel(leftPanelEl);
+    const topBar = new TopBar(topBarEl);
+    const dialog = new GameDialog();
+
+    new HexInteraction(state, board, playerPanel, topBar, dialog);
+  }
+
+  function startMultiplayerGame(stateData: any, localElemental: ElementalType, net: NetworkController) {
+    const state = GameState.fromJSON(stateData);
+    state.localPlayer = localElemental;
+
+    const topBarEl = document.getElementById('top-bar')!;
+    const leftPanelEl = document.getElementById('left-panel')!;
+    const mapAreaEl = document.getElementById('map-area')!;
+
+    const board = new BoardRenderer(mapAreaEl);
+    const playerPanel = new PlayerPanel(leftPanelEl);
+    const topBar = new TopBar(topBarEl);
+    const dialog = new GameDialog();
+
+    new HexInteraction(state, board, playerPanel, topBar, dialog, net);
+  }
 }
 
 document.addEventListener('DOMContentLoaded', init);

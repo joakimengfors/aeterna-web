@@ -29,6 +29,7 @@ src/game/                   ← Pure game logic (no DOM)
   SpecialAbilityDeck.ts     ← 12-card deck (6 unique x2), shuffle, draw, discard
 
 src/ui/                     ← DOM rendering (reads GameState, writes HTML)
+  MainMenu.ts               ← Main menu: local play, host/join game, lobby UI
   BoardRenderer.ts          ← SVG hex grid, token images, integrates ThreeOverlay
   ThreeOverlay.ts           ← Three.js WebGL overlay: 3D model loading, positioning, animation
   HexInteraction.ts         ← Game flow orchestrator: phases, clicks, multi-step actions
@@ -37,6 +38,17 @@ src/ui/                     ← DOM rendering (reads GameState, writes HTML)
   PlayerPanel.ts            ← Left sidebar: opponent cards with supplies/cooldowns
   GameLog.ts                ← Right sidebar: turn order, special card, log entries
   TopBar.ts                 ← Header: turn indicator, phase label
+
+src/network/                ← Multiplayer networking
+  types.ts                  ← ActionIntent, LobbyState, NetworkMessage, SignalingMessage
+  SignalingClient.ts        ← WebSocket client for Cloudflare Worker signaling server
+  PeerConnection.ts         ← WebRTC peer connection + data channel wrapper
+  NetworkController.ts      ← High-level multiplayer orchestrator (host/guest roles)
+
+signaling-worker/           ← Cloudflare Worker signaling server
+  src/index.ts              ← Worker entry + GameRoom Durable Object
+  wrangler.toml             ← Worker config
+  package.json              ← Worker dependencies
 ```
 
 ### Data Flow
@@ -178,7 +190,7 @@ Before any action begins, `GameState.clone()` saves a deep copy. On undo, `Objec
 
 13. **Aeterna (4th player)** — Not in MVP scope. Would require significant game logic additions.
 
-14. **Multiplayer/networking** — Not in scope. Currently local hotseat only.
+14. **Multiplayer/networking** — Main menu + WebRTC infrastructure in place. Host/guest roles, lobby with elemental picker, full state sync after each turn. Signaling server (Cloudflare Worker) needs deployment. Guest action forwarding to host not yet wired.
 
 ## File Sizes
 
@@ -198,13 +210,21 @@ Before any action begins, `GameState.clone()` saves a deep copy. On undo, `Objec
 | `GameLog.ts` | 90 | Log panel |
 | `TopBar.ts` | 69 | Header |
 | `SpecialAbilityDeck.ts` | 62 | Card deck |
+| `MainMenu.ts` | 250 | Main menu + lobby UI |
+| `NetworkController.ts` | 200 | Multiplayer orchestrator |
+| `PeerConnection.ts` | 120 | WebRTC wrapper |
+| `SignalingClient.ts` | 85 | Signaling WebSocket |
+| `network/types.ts` | 60 | Network type definitions |
 | `TurnManager.ts` | 42 | Turn flow |
-| `main.ts` | 29 | Entry point |
+| `main.ts` | 120 | Entry point + menu wiring |
+| `signaling-worker/index.ts` | 210 | Cloudflare Worker signaling |
 
 ## Assets
 
 ```
 public/assets/
+  aeterna_splash.png                     ← Main menu splash background
+  aeterna_logo.png                       ← Game logo for menu
   board.png                              ← Original board (small)
   board_big.png                          ← Large board with ocean (in use)
   characters/

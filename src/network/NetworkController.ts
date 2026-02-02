@@ -1,0 +1,242 @@
+// ========================================
+// Network Controller
+// ========================================
+
+import { SignalingClient } from './SignalingClient';
+import { PeerConnection } from './PeerConnection';
+import { GameState } from '../game/GameState';
+import type { ElementalType } from '../game/types';
+import type { ActionIntent, LobbyState, NetworkMessage, SignalingMessage } from './types';
+
+export type NetworkRole = 'host' | 'guest';
+
+export class NetworkController {
+  private signaling: SignalingClient;
+  private peers: Map<string, PeerConnection> = new Map();
+  private role: NetworkRole;
+  private localId = '';
+  private roomCode = '';
+  private lobbyState: LobbyState | null = null;
+
+  // Callbacks
+  private onLobbyUpdateCallback: ((lobby: LobbyState) => void) | null = null;
+  private onGameStartCallback: ((state: any, localElemental: ElementalType) => void) | null = null;
+  private onRemoteStateCallback: ((state: any) => void) | null = null;
+  private onActionIntentCallback: ((intent: ActionIntent, fromId: string) => void) | null = null;
+  private onErrorCallback: ((msg: string) => void) | null = null;
+  private onPeerConnectedCallback: ((peerId: string) => void) | null = null;
+  private onPeerDisconnectedCallback: ((peerId: string) => void) | null = null;
+
+  constructor(serverUrl: string, role: NetworkRole) {
+    this.signaling = new SignalingClient(serverUrl);
+    this.role = role;
+  }
+
+  get isHost(): boolean {
+    return this.role === 'host';
+  }
+
+  get lobby(): LobbyState | null {
+    return this.lobbyState;
+  }
+
+  get code(): string {
+    return this.roomCode;
+  }
+
+  get playerId(): string {
+    return this.localId;
+  }
+
+  // --- Event handlers ---
+
+  onLobbyUpdate(cb: (lobby: LobbyState) => void) { this.onLobbyUpdateCallback = cb; }
+  onGameStart(cb: (state: any, localElemental: ElementalType) => void) { this.onGameStartCallback = cb; }
+  onRemoteState(cb: (state: any) => void) { this.onRemoteStateCallback = cb; }
+  onActionIntent(cb: (intent: ActionIntent, fromId: string) => void) { this.onActionIntentCallback = cb; }
+  onError(cb: (msg: string) => void) { this.onErrorCallback = cb; }
+  onPeerConnected(cb: (peerId: string) => void) { this.onPeerConnectedCallback = cb; }
+  onPeerDisconnected(cb: (peerId: string) => void) { this.onPeerDisconnectedCallback = cb; }
+
+  // --- Connection ---
+
+  async createRoom(): Promise<void> {
+    this.signaling.onMessage((msg) => this.handleSignalingMessage(msg));
+    await this.signaling.createRoom();
+  }
+
+  async joinRoom(code: string): Promise<void> {
+    this.signaling.onMessage((msg) => this.handleSignalingMessage(msg));
+    await this.signaling.joinRoom(code);
+  }
+
+  pickElemental(elemental: ElementalType) {
+    this.signaling.pickElemental(elemental);
+  }
+
+  startGame(state: GameState, assignments: Record<string, ElementalType>) {
+    if (!this.isHost) return;
+
+    const stateData = GameState.toJSON(state);
+    const msg: NetworkMessage = {
+      type: 'game-start',
+      state: stateData,
+      playerAssignments: assignments,
+    };
+
+    // Send to all peers
+    for (const peer of this.peers.values()) {
+      peer.send(msg);
+    }
+
+    this.signaling.startGame();
+  }
+
+  // --- Game messages ---
+
+  sendAction(intent: ActionIntent) {
+    const msg: NetworkMessage = { type: 'action', intent };
+    if (this.isHost) {
+      // Host processes locally — shouldn't call this normally
+    } else {
+      // Guest sends to host
+      for (const peer of this.peers.values()) {
+        peer.send(msg);
+      }
+    }
+  }
+
+  broadcastState(state: GameState) {
+    if (!this.isHost) return;
+    const msg: NetworkMessage = { type: 'state-update', data: GameState.toJSON(state) };
+    for (const peer of this.peers.values()) {
+      peer.send(msg);
+    }
+  }
+
+  // --- Internal ---
+
+  private handleSignalingMessage(msg: SignalingMessage) {
+    switch (msg.type) {
+      case 'room-created':
+        this.roomCode = msg.code;
+        this.localId = msg.hostId;
+        this.lobbyState = {
+          roomCode: msg.code,
+          hostId: msg.hostId,
+          players: [{ id: msg.hostId, elemental: null, ready: false }],
+          started: false,
+        };
+        this.onLobbyUpdateCallback?.(this.lobbyState);
+        break;
+
+      case 'room-joined':
+        this.localId = msg.playerId;
+        this.lobbyState = {
+          roomCode: '',
+          hostId: msg.hostId,
+          players: msg.players.map(p => ({ id: p.id, elemental: p.elemental, ready: false })),
+          started: false,
+        };
+        // Create peer connection to host
+        this.createPeer(msg.hostId, false);
+        this.onLobbyUpdateCallback?.(this.lobbyState);
+        break;
+
+      case 'player-joined':
+        if (this.lobbyState) {
+          this.lobbyState.players.push({ id: msg.playerId, elemental: null, ready: false });
+          this.onLobbyUpdateCallback?.(this.lobbyState);
+        }
+        // Host creates peer connection to new player
+        if (this.isHost) {
+          this.createPeer(msg.playerId, true);
+        }
+        break;
+
+      case 'player-left':
+        if (this.lobbyState) {
+          this.lobbyState.players = this.lobbyState.players.filter(p => p.id !== msg.playerId);
+          this.onLobbyUpdateCallback?.(this.lobbyState);
+        }
+        this.peers.get(msg.playerId)?.close();
+        this.peers.delete(msg.playerId);
+        this.onPeerDisconnectedCallback?.(msg.playerId);
+        break;
+
+      case 'elemental-picked':
+        if (this.lobbyState) {
+          const player = this.lobbyState.players.find(p => p.id === msg.playerId);
+          if (player) player.elemental = msg.elemental;
+          this.onLobbyUpdateCallback?.(this.lobbyState);
+        }
+        break;
+
+      case 'signal':
+        this.handlePeerSignal(msg.from, msg.data);
+        break;
+
+      case 'error':
+        this.onErrorCallback?.(msg.message);
+        break;
+    }
+  }
+
+  private createPeer(remoteId: string, initiator: boolean) {
+    const peer = new PeerConnection(this.signaling, this.localId, remoteId);
+
+    peer.onConnected(() => {
+      this.onPeerConnectedCallback?.(remoteId);
+    });
+
+    peer.onDisconnected(() => {
+      this.onPeerDisconnectedCallback?.(remoteId);
+    });
+
+    peer.onMessage((data: NetworkMessage) => {
+      this.handlePeerMessage(data, remoteId);
+    });
+
+    this.peers.set(remoteId, peer);
+
+    if (initiator) {
+      peer.createOffer();
+    }
+  }
+
+  private async handlePeerSignal(fromId: string, data: any) {
+    let peer = this.peers.get(fromId);
+    if (!peer) {
+      // Create peer on demand (for guests receiving from host)
+      this.createPeer(fromId, false);
+      peer = this.peers.get(fromId)!;
+    }
+    await peer.handleSignal(data);
+  }
+
+  private handlePeerMessage(msg: NetworkMessage, fromId: string) {
+    switch (msg.type) {
+      case 'action':
+        this.onActionIntentCallback?.(msg.intent, fromId);
+        break;
+      case 'state-update':
+        this.onRemoteStateCallback?.(msg.data);
+        break;
+      case 'full-state':
+        this.onRemoteStateCallback?.(msg.data);
+        break;
+      case 'game-start':
+        const myElemental = msg.playerAssignments[this.localId];
+        this.onGameStartCallback?.(msg.state, myElemental);
+        break;
+    }
+  }
+
+  close() {
+    for (const peer of this.peers.values()) {
+      peer.close();
+    }
+    this.peers.clear();
+    this.signaling.close();
+  }
+}

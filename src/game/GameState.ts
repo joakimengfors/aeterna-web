@@ -16,6 +16,7 @@ export class GameState {
   specialDeck: SpecialAbilityDeck;
   log: GameEvent[] = [];
   winner: ElementalType | null = null;
+  localPlayer: ElementalType | null = null; // null = hotseat
 
   // Pending action state (for multi-step execution)
   pendingAction: ActionId | null = null;
@@ -204,6 +205,68 @@ export class GameState {
     });
   }
 
+  // --- Serialization ---
+
+  static toJSON(state: GameState): any {
+    return {
+      board: Array.from(state.board.entries()).map(([id, hex]) => [id, {
+        tokens: [...hex.tokens],
+        elemental: hex.elemental,
+        stoneMinion: hex.stoneMinion,
+      }]),
+      players: Array.from(state.players.entries()).map(([type, p]) => [type, {
+        ...p,
+        supplies: { ...p.supplies },
+      }]),
+      turnOrder: [...state.turnOrder],
+      currentPlayerIndex: state.currentPlayerIndex,
+      turnNumber: state.turnNumber,
+      phase: state.phase,
+      specialDeck: {
+        deck: state.specialDeck.deck.map(c => ({ ...c })),
+        discard: state.specialDeck.discard.map(c => ({ ...c })),
+      },
+      log: [...state.log],
+      winner: state.winner,
+      pendingAction: state.pendingAction,
+      pendingSteps: [...state.pendingSteps],
+      stepInstruction: state.stepInstruction,
+      sotUsed: state.sotUsed,
+      pendingForcedMove: state.pendingForcedMove,
+      pendingFogMove: state.pendingFogMove,
+    };
+  }
+
+  static fromJSON(data: any): GameState {
+    const gs = Object.create(GameState.prototype) as GameState;
+    gs.board = new Map(data.board.map(([id, hex]: [number, any]) => [id, {
+      tokens: [...hex.tokens],
+      elemental: hex.elemental,
+      stoneMinion: hex.stoneMinion,
+    }]));
+    gs.players = new Map(data.players.map(([type, p]: [string, any]) => [type, {
+      ...p,
+      supplies: { ...p.supplies },
+    }]));
+    gs.turnOrder = [...data.turnOrder];
+    gs.currentPlayerIndex = data.currentPlayerIndex;
+    gs.turnNumber = data.turnNumber;
+    gs.phase = data.phase;
+    gs.specialDeck = new SpecialAbilityDeck();
+    gs.specialDeck.deck = data.specialDeck.deck.map((c: any) => ({ ...c }));
+    gs.specialDeck.discard = data.specialDeck.discard.map((c: any) => ({ ...c }));
+    gs.log = [...data.log];
+    gs.winner = data.winner;
+    gs.pendingAction = data.pendingAction;
+    gs.pendingSteps = [...(data.pendingSteps || [])];
+    gs.stepInstruction = data.stepInstruction || '';
+    gs.sotUsed = data.sotUsed || false;
+    gs.pendingForcedMove = data.pendingForcedMove || null;
+    gs.pendingFogMove = data.pendingFogMove || false;
+    gs.localPlayer = null;
+    return gs;
+  }
+
   /** Deep clone for undo/preview */
   clone(): GameState {
     const gs = new GameState();
@@ -236,6 +299,7 @@ export class GameState {
     gs.sotUsed = this.sotUsed;
     gs.pendingForcedMove = this.pendingForcedMove ? { ...this.pendingForcedMove, validTargets: [...this.pendingForcedMove.validTargets] } : null;
     gs.pendingFogMove = this.pendingFogMove;
+    gs.localPlayer = this.localPlayer;
     return gs;
   }
 }

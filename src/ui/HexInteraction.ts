@@ -14,6 +14,7 @@ import { GameDialog } from './GameDialog';
 import type { ActionId, HexId, ElementalType } from '../game/types';
 import { getActionsForElemental } from '../game/types';
 import { getNeighbors, getLineHexes, isShore, ALL_HEX_IDS, getShortestPath, getPixelPos } from '../game/HexGrid';
+import type { NetworkController } from '../network/NetworkController';
 
 const NAMES: Record<ElementalType, string> = { earth: 'Kaijom', water: 'Nitsuji', fire: 'Krakatoa' };
 
@@ -63,12 +64,16 @@ export class HexInteraction {
   // Animation: pending move animation to play after render
   private pendingAnimation: { type: ElementalType | 'minion'; path: HexId[] } | null = null;
 
+  // Network
+  private network: NetworkController | null = null;
+
   constructor(
     state: GameState,
     board: BoardRenderer,
     playerPanel: PlayerPanel,
     topBar: TopBar,
     dialog: GameDialog,
+    network?: NetworkController,
   ) {
     this.state = state;
     this.executor = new ActionExecutor(state);
@@ -77,9 +82,66 @@ export class HexInteraction {
     this.playerPanel = playerPanel;
     this.topBar = topBar;
     this.dialog = dialog;
+    this.network = network || null;
+
+    if (this.network) {
+      this.setupNetworkHandlers();
+    }
 
     this.board.setHexClickHandler((hexId) => this.onHexClick(hexId));
     this.showTurnBanner(() => this.renderAll());
+  }
+
+  private get isMultiplayer(): boolean {
+    return this.state.localPlayer !== null;
+  }
+
+  private get isMyTurn(): boolean {
+    if (!this.isMultiplayer) return true;
+    return this.state.currentPlayer === this.state.localPlayer;
+  }
+
+  private setupNetworkHandlers() {
+    if (!this.network) return;
+
+    if (this.network.isHost) {
+      // Host receives action intents from guests
+      this.network.onActionIntent((intent, fromId) => {
+        // Validate and apply — for now, trust the intent
+        // In a full implementation, you'd validate the intent against game rules
+        // and only then apply + broadcast
+      });
+    } else {
+      // Guest receives state updates from host
+      this.network.onRemoteState((data) => {
+        this.applyRemoteState(data);
+      });
+    }
+  }
+
+  applyRemoteState(stateData: any) {
+    const newState = GameState.fromJSON(stateData);
+    newState.localPlayer = this.state.localPlayer;
+
+    // Replace state fields
+    this.state.board = newState.board;
+    this.state.players = newState.players;
+    this.state.turnOrder = newState.turnOrder;
+    this.state.currentPlayerIndex = newState.currentPlayerIndex;
+    this.state.turnNumber = newState.turnNumber;
+    this.state.phase = newState.phase;
+    this.state.specialDeck = newState.specialDeck;
+    this.state.log = newState.log;
+    this.state.winner = newState.winner;
+    this.state.pendingAction = newState.pendingAction;
+    this.state.pendingSteps = newState.pendingSteps;
+    this.state.stepInstruction = newState.stepInstruction;
+    this.state.sotUsed = newState.sotUsed;
+    this.state.pendingForcedMove = newState.pendingForcedMove;
+    this.state.pendingFogMove = newState.pendingFogMove;
+
+    this.executor = new ActionExecutor(this.state);
+    this.renderAll();
   }
 
   /** Queue a movement animation to play after the next board.render() call */
@@ -189,6 +251,13 @@ export class HexInteraction {
     this.topBar.render(this.state);
     this.dialog.setTheme(this.state.currentPlayer);
 
+    // In multiplayer, show waiting message when it's not our turn
+    if (this.isMultiplayer && !this.isMyTurn) {
+      const waitingName = NAMES[this.state.currentPlayer];
+      this.dialog.showInfo(`Waiting for ${waitingName}...`, `${waitingName} is taking their turn.`);
+      return;
+    }
+
     // Auto-start SOT ability when entering START_OF_TURN
     if (this.state.phase === 'START_OF_TURN') {
       this.onSOTStart();
@@ -275,6 +344,7 @@ export class HexInteraction {
   // ==========================================
 
   private onActionSelected(actionId: ActionId) {
+    if (this.isMultiplayer && !this.isMyTurn) return;
     this.savedState = this.state.clone();
     this.selectedAction = actionId;
     this.actionTargets = [];
@@ -512,6 +582,7 @@ export class HexInteraction {
   // ==========================================
 
   private onHexClick(hexId: HexId) {
+    if (this.isMultiplayer && !this.isMyTurn) return;
     if (!this.validTargets.includes(hexId)) return;
 
     // Auto-dismiss any non-blocking info dialog
@@ -1117,6 +1188,12 @@ export class HexInteraction {
     this.waterHexBeforeMosey = null;
     this.turnMgr.endTurn();
     this.executor = new ActionExecutor(this.state);
+
+    // Broadcast state to guests after turn ends
+    if (this.network?.isHost) {
+      this.network.broadcastState(this.state);
+    }
+
     this.showTurnBanner(() => this.renderAll());
   }
 
