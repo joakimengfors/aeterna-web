@@ -51,7 +51,7 @@ export class HexInteraction {
   private raiseMountainPlaceFirst = false;
 
   // Firestorm: snapshot of fire groups at start, track which have been extended
-  private firestormGroups: { id: string; hexes: Set<string> }[] = [];
+  private firestormGroups: { id: string; hexes: Set<HexId> }[] = [];
   private firestormExtendedGroupIds = new Set<string>();
   private firestormMaxTokens = 0;
 
