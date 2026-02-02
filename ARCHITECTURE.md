@@ -2,13 +2,14 @@
 
 ## Overview
 
-3-player hotseat hex board game built with vanilla TypeScript + Vite. No game framework — pure SVG hex grid with CSS 3D transforms for a tilted board perspective and standing meeples.
+3-player hotseat hex board game built with vanilla TypeScript + Vite. No game framework — SVG hex grid with CSS 3D transforms for a tilted board perspective, Three.js WebGL overlay for 3D meeple and token models.
 
 ## Tech Stack
 
 - **Runtime**: Vanilla TypeScript, no framework
 - **Bundler**: Vite
-- **Rendering**: SVG hex grid + HTML overlay for 3D standees
+- **3D Models**: Three.js + GLTFLoader for 3D meeples and token models (GLB format)
+- **Rendering**: SVG hex grid + Three.js WebGL overlay for 3D models + HTML fallback for standees
 - **Styling**: Inline CSS in `index.html` + `src/assets/styles.css` (design system)
 - **Fonts**: Cinzel (display), Inter (body), Material Icons
 
@@ -28,8 +29,10 @@ src/game/                   ← Pure game logic (no DOM)
   SpecialAbilityDeck.ts     ← 12-card deck (6 unique x2), shuffle, draw, discard
 
 src/ui/                     ← DOM rendering (reads GameState, writes HTML)
-  BoardRenderer.ts          ← SVG hex grid, token images, 3D standee overlay
+  BoardRenderer.ts          ← SVG hex grid, token images, integrates ThreeOverlay
+  ThreeOverlay.ts           ← Three.js WebGL overlay: 3D model loading, positioning, animation
   HexInteraction.ts         ← Game flow orchestrator: phases, clicks, multi-step actions
+  GameDialog.ts             ← Modal dialogs: action choice, confirm, info, victory screen
   ActionBar.ts              ← Bottom panel: SOT card (phase 1), action cards (phase 2)
   PlayerPanel.ts            ← Left sidebar: opponent cards with supplies/cooldowns
   GameLog.ts                ← Right sidebar: turn order, special card, log entries
@@ -77,6 +80,14 @@ Before any action begins, `GameState.clone()` saves a deep copy. On undo, `Objec
 - **Background**: `board_big.png` on `::before` pseudo-element with `inset: -40%` for ocean bleed
 - **Standees**: Three.js WebGL overlay for 3D models (earth, water, fire elementals + stone minion), HTML div fallback for types without GLB
 - **Tokens**: SVG `<image>` elements for forest/fire/lake tokens. Fog and mountain rendered as 3D models via ThreeOverlay (multi-instance cloning). HTML standee fallback when 3D unavailable
+
+### 3D Model System (ThreeOverlay)
+
+- **Singleton models**: One instance per type (earth, fire, water, stone_minion). Loaded at init, positioned via `setPosition(type, hexId)`.
+- **Multi-instance models**: Fog and mountain tokens. Template GLB loaded once, cloned per hex. Synced via `setTokenPositions(type, hexIds[])` which diffs current vs target and adds/removes clones.
+- **Orientation**: Per-model `preRotateX`/`preRotateY` to fix authoring orientation, then `tilt` (-1.15 rad) for board perspective.
+- **Movement animation**: `animateAlongPath()` for singletons (turn→move→turn per hop, 260ms/hex). `animateTokenMove()` for tokens (turn→slide→turn, 350ms). Per-model `facingOffset` controls rotation direction.
+- **Async loading**: Pending positions queued while GLB loads, applied automatically on load complete.
 
 ## Game Rules Implemented
 
@@ -127,8 +138,10 @@ Before any action begins, `GameState.clone()` saves a deep copy. On undo, `Objec
 - [x] Mountain chain destruction (Landslide)
 - [x] All win conditions (capture, forests, fire tokens, trapping)
 - [x] Special ability deck with all 6 card types
-- [x] 3D tilted board with standing meeples
+- [x] 3D tilted board with Three.js GLB models for all elementals, stone minion, fog, and mountain
+- [x] Movement animations with turn-move-turn for all 3D models (elementals, minion, fog)
 - [x] Board background image (board_big.png) with ocean bleed
+- [x] Victory screen with winner portrait, win reason, game stats, and rematch button
 - [x] Game log with turn-by-turn history
 - [x] Player panels with opponent info, supplies, cooldown status
 - [x] Character switcher for hotseat play
@@ -153,13 +166,11 @@ Before any action begins, `GameState.clone()` saves a deep copy. On undo, `Objec
 
 ### Polish / Nice to Have
 
-7. **Animations** — No token placement or destruction animations beyond spawn. Movement animations exist for elementals and minion. Could add more CSS transitions or requestAnimationFrame sequences.
+7. **Token animations** — No token placement or destruction animations beyond spawn. Could add CSS transitions or requestAnimationFrame sequences for token appear/disappear.
 
 8. **Sound effects** — No audio at all. Hooks could be added at action execution points.
 
-9. **Win screen** — Currently just `alert()`. Should show a proper victory overlay.
-
-10. **Board hex numbers** — Still visible (useful for debugging). Could be toggled or hidden for clean gameplay.
+9. **Board hex numbers** — Still visible (useful for debugging). Could be toggled or hidden for clean gameplay.
 
 11. **Mobile/responsive** — Layout is desktop-only (3-column grid). Would need significant rework for mobile.
 
@@ -173,20 +184,22 @@ Before any action begins, `GameState.clone()` saves a deep copy. On undo, `Objec
 
 | File | Lines | Role |
 |------|-------|------|
-| `ActionExecutor.ts` | 855 | Largest — all game actions |
-| `HexInteraction.ts` | 531 | Game flow orchestration |
-| `BoardRenderer.ts` | 290 | SVG + standee rendering |
-| `HexGrid.ts` | 238 | Grid math and adjacency |
-| `GameState.ts` | 236 | State management |
-| `ActionBar.ts` | 197 | Bottom panel UI |
-| `PlayerPanel.ts` | 136 | Opponent cards |
-| `WinChecker.ts` | 98 | Victory conditions |
-| `types.ts` | 96 | Type definitions |
-| `GameLog.ts` | 91 | Log panel |
-| `SpecialAbilityDeck.ts` | 63 | Card deck |
-| `TopBar.ts` | 55 | Header |
-| `TurnManager.ts` | 43 | Turn flow |
-| `main.ts` | 33 | Entry point |
+| `HexInteraction.ts` | 1234 | Game flow orchestration, input handling |
+| `ActionExecutor.ts` | 924 | All game actions + validation |
+| `BoardRenderer.ts` | 471 | SVG board + ThreeOverlay integration |
+| `ThreeOverlay.ts` | 426 | Three.js 3D model loading + animation |
+| `GameDialog.ts` | 352 | Modal dialogs + victory screen |
+| `HexGrid.ts` | 270 | Grid math, adjacency, pathfinding |
+| `GameState.ts` | 241 | State management |
+| `ActionBar.ts` | 210 | Bottom panel UI |
+| `PlayerPanel.ts` | 166 | Opponent cards |
+| `WinChecker.ts` | 97 | Victory conditions |
+| `types.ts` | 95 | Type definitions |
+| `GameLog.ts` | 90 | Log panel |
+| `TopBar.ts` | 69 | Header |
+| `SpecialAbilityDeck.ts` | 62 | Card deck |
+| `TurnManager.ts` | 42 | Turn flow |
+| `main.ts` | 29 | Entry point |
 
 ## Assets
 
