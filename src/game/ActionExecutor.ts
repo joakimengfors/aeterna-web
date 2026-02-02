@@ -106,8 +106,9 @@ export class ActionExecutor {
   private executeEarthSOT(targetHex: HexId) {
     const hex = this.state.getHex(targetHex);
 
-    // Stone Minion destroys ALL tokens on destination
+    // Stone Minion destroys tokens on destination (fog is indestructible)
     for (const token of [...hex.tokens]) {
+      if (token === 'fog') continue;
       this.state.destroyToken(targetHex, token);
     }
 

@@ -171,7 +171,7 @@ export class ActionBar {
         <div class="actions-label">Choose an Action</div>
         <div class="actions-grid">
           ${actions.map(a => `
-            <div class="action-card${a.id === player.actionMarker ? ' blocked' : ''}${a.id === 'special' ? ' special' : ''}" data-action="${a.id}">
+            <div class="action-card${state.pendingAction === 'special' ? (a.id === 'special' ? ' blocked' : '') : (a.id === player.actionMarker ? ' blocked' : '')}${a.id === 'special' ? ' special' : ''}" data-action="${a.id}">
               ${ABILITY_ICONS[a.id] ? `<div class="ability-icon" style="background-image: url('${ABILITY_ICONS[a.id].image}'); background-position: ${ABILITY_ICONS[a.id].pos};"></div>` : ''}
               <div class="action-card-content">
                 <div class="action-card-header">
