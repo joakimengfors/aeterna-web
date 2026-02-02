@@ -6,40 +6,46 @@ import type { GameState } from '../game/GameState';
 import type { ElementalType, ActionId } from '../game/types';
 import { getActionsForElemental } from '../game/types';
 
-const HUNT_CHAIN: Record<ElementalType, ElementalType> = {
+const HUNT_CHAIN: Record<ElementalType, ElementalType | null> = {
   earth: 'water',
   water: 'fire',
   fire: 'earth',
+  aeterna: null,
 };
 
 const ELEMENTAL_NAMES: Record<ElementalType, string> = {
   earth: 'Kaijom',
   water: 'Nitsuji',
   fire: 'Krakatoa',
+  aeterna: 'Aeterna',
 };
 
 const ELEMENTAL_LABELS: Record<ElementalType, string> = {
   earth: 'Earth',
   water: 'Water',
   fire: 'Fire',
+  aeterna: 'The Island',
 };
 
 const WIN_CONDITIONS: Record<ElementalType, string> = {
   earth: 'Catch <strong>Nitsuji</strong> or 3 Forests on board',
   water: 'Catch <strong>Krakatoa</strong> or trap Fire',
   fire: 'Catch <strong>Kaijom</strong> or place all 12 Fire tokens',
+  aeterna: 'Balance all powers or exhaust the deck',
 };
 
 const AVATAR_IMAGES: Record<ElementalType, string> = {
   earth: 'assets/characters/elementals_illustration (earth).png',
   water: 'assets/characters/elementals_illustration (water).png',
   fire: 'assets/characters/elementals_illustration (fire).png',
+  aeterna: 'assets/characters/elementals_illustration (aeterna).png',
 };
 
 const CARD_IMAGES: Record<ElementalType, string> = {
   earth: 'assets/kaijom.png',
   water: 'assets/nitsuji.png',
   fire: 'assets/krakatoa.png',
+  aeterna: 'assets/aeterna.png',
 };
 
 export class PlayerPanel {
@@ -53,7 +59,7 @@ export class PlayerPanel {
     const playerCards = state.turnOrder.map(type => {
       const player = state.getPlayer(type);
       const isActive = type === currentPlayer;
-      const isHunting = HUNT_CHAIN[type] === currentPlayer;
+      const isHunting = HUNT_CHAIN[type] !== null && HUNT_CHAIN[type] === currentPlayer;
 
       return `
         <div class="player-card theme-${type}${isActive ? ' active-turn' : ''}">
@@ -80,6 +86,7 @@ export class PlayerPanel {
             <div class="token-supply">
               ${this.renderSupply(player.supplies, type)}
             </div>
+            ${type === 'aeterna' ? this.renderPowerTrack(state) : ''}
             <div class="action-markers">
               <button class="action-info-btn" data-player="${type}">
                 <span class="material-icons">info_outline</span>
@@ -138,6 +145,33 @@ export class PlayerPanel {
     });
   }
 
+  private renderPowerTrack(state: GameState): string {
+    const powers: { type: ElementalType; name: string; power: number; color: string }[] = [
+      { type: 'earth', name: 'Earth', power: state.getElementalPower('earth'), color: 'var(--earth-primary)' },
+      { type: 'water', name: 'Water', power: state.getElementalPower('water'), color: 'var(--water-primary)' },
+      { type: 'fire', name: 'Fire', power: state.getElementalPower('fire'), color: 'var(--fire-primary)' },
+    ];
+    const allEqual = powers[0].power === powers[1].power && powers[1].power === powers[2].power;
+
+    return `
+      <div class="power-track">
+        <div class="power-track-label">
+          <span class="material-icons">balance</span>
+          Elemental Power ${allEqual ? '<span class="power-balanced">⚖ Balanced!</span>' : ''}
+        </div>
+        ${powers.map(p => `
+          <div class="power-track-row">
+            <span class="power-track-name" style="color: ${p.color}">${p.name}</span>
+            <div class="power-track-bar">
+              ${[1, 2, 3, 4, 5].map(i => `<div class="power-pip${i <= p.power ? ' filled' : ''}" style="--pip-color: ${p.color}"></div>`).join('')}
+            </div>
+            <span class="power-track-value">${p.power}</span>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
   private renderSupply(supplies: Record<string, number>, type: ElementalType): string {
     const chips: string[] = [];
     for (const [token, count] of Object.entries(supplies)) {
@@ -160,6 +194,7 @@ export class PlayerPanel {
       case 'fire': return 12;
       case 'lake': return 5;
       case 'fog': return 2;
+      case 'ocean': return 2;
       default: return 0;
     }
   }

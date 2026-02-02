@@ -37,6 +37,7 @@ export class TurnManager {
       case 'earth': return 'Kaijom';
       case 'water': return 'Nitsuji';
       case 'fire': return 'Krakatoa';
+      case 'aeterna': return 'Aeterna';
     }
   }
 }

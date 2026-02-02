@@ -67,8 +67,8 @@ export class SignalingClient {
     this.send({ type: 'pick-elemental', elemental });
   }
 
-  startGame() {
-    this.send({ type: 'start-game' });
+  startGame(state?: any, playerAssignments?: Record<string, any>) {
+    this.send({ type: 'start-game', state, playerAssignments });
   }
 
   close() {

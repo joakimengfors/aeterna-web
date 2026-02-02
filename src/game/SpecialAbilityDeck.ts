@@ -16,9 +16,15 @@ function shuffle<T>(arr: T[]): T[] {
 export class SpecialAbilityDeck {
   deck: SpecialCard[] = [];
   discard: SpecialCard[] = [];
+  noReshuffle = false; // true in 4-player: deck doesn't reshuffle
 
-  constructor() {
+  constructor(noReshuffle = false) {
+    this.noReshuffle = noReshuffle;
     this.buildDeck();
+  }
+
+  get isDeckExhausted(): boolean {
+    return this.deck.length === 0;
   }
 
   private buildDeck() {
@@ -44,8 +50,8 @@ export class SpecialAbilityDeck {
     const used = this.deck.shift()!;
     this.discard.push(used);
 
-    // If deck exhausted, reshuffle discard
-    if (this.deck.length === 0 && this.discard.length > 0) {
+    // If deck exhausted, reshuffle discard (unless 4-player mode)
+    if (this.deck.length === 0 && this.discard.length > 0 && !this.noReshuffle) {
       this.deck = shuffle(this.discard);
       this.discard = [];
     }
@@ -54,7 +60,7 @@ export class SpecialAbilityDeck {
   }
 
   clone(): SpecialAbilityDeck {
-    const d = new SpecialAbilityDeck();
+    const d = new SpecialAbilityDeck(this.noReshuffle);
     d.deck = this.deck.map(c => ({ ...c }));
     d.discard = this.discard.map(c => ({ ...c }));
     return d;

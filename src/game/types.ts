@@ -2,9 +2,9 @@
 // Aeterna: Clash of Elements - Type System
 // ========================================
 
-export type ElementalType = 'earth' | 'water' | 'fire';
+export type ElementalType = 'earth' | 'water' | 'fire' | 'aeterna';
 
-export type TokenType = 'mountain' | 'forest' | 'fire' | 'lake' | 'fog';
+export type TokenType = 'mountain' | 'forest' | 'fire' | 'lake' | 'fog' | 'ocean';
 
 export type Phase = 'START_OF_TURN' | 'CHOOSE_ACTION' | 'EXECUTING' | 'CONFIRM';
 
@@ -17,7 +17,10 @@ export type WaterAction = 'mosey' | 'conjure' | 'surf' | 'rematerialize' | 'spec
 // Fire actions
 export type FireAction = 'smoke-dash' | 'flame-dash' | 'firestorm' | 'firewall' | 'special';
 
-export type ActionId = EarthAction | WaterAction | FireAction;
+// Aeterna actions (no Special Ability)
+export type AeternaAction = 'tides-embrace' | 'ash-to-lush' | 'bark-and-bough' | 'aeternas-favor';
+
+export type ActionId = EarthAction | WaterAction | FireAction | AeternaAction;
 
 export interface ActionDef {
   id: ActionId;
@@ -51,11 +54,19 @@ export const FIRE_ACTIONS: ActionDef[] = [
   { id: 'special', name: 'Special', description: 'Use the active Special Ability card.', elementalType: 'fire' },
 ];
 
+export const AETERNA_ACTIONS: ActionDef[] = [
+  { id: 'tides-embrace', name: "Tide's Embrace", description: 'Place an ocean tile on an empty shore hex, or move an existing ocean tile.', elementalType: 'aeterna' },
+  { id: 'ash-to-lush', name: 'Ash to Lush', description: "Place a Fire token from Fire's supply on an empty hex. If supply empty, move an existing Fire token.", elementalType: 'aeterna' },
+  { id: 'bark-and-bough', name: 'Bark and Bough', description: "Place a Forest from Earth's supply on an empty hex. If supply empty, move an existing Forest.", elementalType: 'aeterna' },
+  { id: 'aeternas-favor', name: "Aeterna's Favor", description: "Remove the action marker from one Elemental's ability.", elementalType: 'aeterna' },
+];
+
 export function getActionsForElemental(type: ElementalType): ActionDef[] {
   switch (type) {
     case 'earth': return EARTH_ACTIONS;
     case 'water': return WATER_ACTIONS;
     case 'fire': return FIRE_ACTIONS;
+    case 'aeterna': return AETERNA_ACTIONS;
   }
 }
 

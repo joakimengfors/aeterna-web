@@ -10,6 +10,7 @@ export class GameState {
   board: Map<HexId, HexState> = new Map();
   players: Map<ElementalType, PlayerState> = new Map();
   turnOrder: ElementalType[] = ['earth', 'water', 'fire'];
+  playerCount = 3;
   currentPlayerIndex = 0;
   turnNumber = 1;
   phase: Phase = 'START_OF_TURN';
@@ -26,10 +27,18 @@ export class GameState {
   pendingForcedMove: { player: ElementalType; validTargets: HexId[] } | null = null;
   pendingFogMove = false; // true when Water moved (not teleported) and fogs need moving
 
-  constructor() {
-    this.specialDeck = new SpecialAbilityDeck();
+  constructor(playerCount = 3) {
+    this.playerCount = playerCount;
+    if (playerCount === 4) {
+      this.turnOrder = ['earth', 'water', 'fire', 'aeterna'];
+    }
+    this.specialDeck = new SpecialAbilityDeck(playerCount === 4);
     this.initBoard();
     this.setupScenario1();
+  }
+
+  get is4Player(): boolean {
+    return this.playerCount === 4;
   }
 
   private initBoard() {
@@ -73,7 +82,17 @@ export class GameState {
     this.addToken(24, 'fire');       // Fire on hex 24
     this.setStoneMinion(19);         // Stone Minion on hex 19
 
-    this.addLog('Game started. Scenario 1.');
+    // Aeterna (4-player only)
+    if (this.is4Player) {
+      this.players.set('aeterna', {
+        type: 'aeterna',
+        hexId: 0 as HexId, // off-board
+        actionMarker: null,
+        supplies: { ocean: 2 },
+      });
+    }
+
+    this.addLog(`Game started. Scenario 1. ${this.is4Player ? '4-player mode.' : ''}`);
   }
 
   get currentPlayer(): ElementalType {
@@ -134,9 +153,14 @@ export class GameState {
 
   isHexEmpty(hexId: HexId): boolean {
     const hex = this.getHex(hexId);
-    // Fog doesn't count as blocking
+    // Fog doesn't count as blocking; ocean tiles block completely
     const nonFogTokens = hex.tokens.filter(t => t !== 'fog');
     return nonFogTokens.length === 0 && !hex.elemental && !hex.stoneMinion;
+  }
+
+  /** Check if hex has an ocean tile (completely out of bounds) */
+  isOceanHex(hexId: HexId): boolean {
+    return this.hasToken(hexId, 'ocean');
   }
 
   /** Count tokens of a type on the board */
@@ -163,7 +187,20 @@ export class GameState {
       case 'mountain': case 'forest': return 'earth';
       case 'lake': case 'fog': return 'water';
       case 'fire': return 'fire';
+      case 'ocean': return 'aeterna';
     }
+  }
+
+  /** Get elemental power level for Aeterna's balance tracking (capped at 5) */
+  getElementalPower(type: ElementalType): number {
+    let count: number;
+    switch (type) {
+      case 'earth': count = this.countTokensOnBoard('mountain') + this.countTokensOnBoard('forest'); break;
+      case 'water': count = this.countTokensOnBoard('lake'); break;
+      case 'fire': count = this.countTokensOnBoard('fire'); break;
+      default: return 0;
+    }
+    return Math.min(count, 5);
   }
 
   /** Remove a token from a hex and return it to supply */
@@ -219,6 +256,7 @@ export class GameState {
         supplies: { ...p.supplies },
       }]),
       turnOrder: [...state.turnOrder],
+      playerCount: state.playerCount,
       currentPlayerIndex: state.currentPlayerIndex,
       turnNumber: state.turnNumber,
       phase: state.phase,
@@ -249,10 +287,11 @@ export class GameState {
       supplies: { ...p.supplies },
     }]));
     gs.turnOrder = [...data.turnOrder];
+    gs.playerCount = data.playerCount ?? 3;
     gs.currentPlayerIndex = data.currentPlayerIndex;
     gs.turnNumber = data.turnNumber;
     gs.phase = data.phase;
-    gs.specialDeck = new SpecialAbilityDeck();
+    gs.specialDeck = new SpecialAbilityDeck(gs.playerCount === 4);
     gs.specialDeck.deck = data.specialDeck.deck.map((c: any) => ({ ...c }));
     gs.specialDeck.discard = data.specialDeck.discard.map((c: any) => ({ ...c }));
     gs.log = [...data.log];
@@ -288,6 +327,7 @@ export class GameState {
       });
     }
     gs.turnOrder = [...this.turnOrder];
+    gs.playerCount = this.playerCount;
     gs.currentPlayerIndex = this.currentPlayerIndex;
     gs.turnNumber = this.turnNumber;
     gs.phase = this.phase;

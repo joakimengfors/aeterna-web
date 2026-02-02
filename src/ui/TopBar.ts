@@ -9,10 +9,17 @@ const ELEMENTAL_NAMES: Record<ElementalType, string> = {
   earth: 'Kaijom',
   water: 'Nitsuji',
   fire: 'Krakatoa',
+  aeterna: 'Aeterna',
 };
 
 export class TopBar {
+  private menuCallback: (() => void) | null = null;
+
   constructor(private container: HTMLElement) {}
+
+  onMenuClick(cb: () => void) {
+    this.menuCallback = cb;
+  }
 
   render(state: GameState) {
     const type = state.currentPlayer;
@@ -29,6 +36,7 @@ export class TopBar {
           </div>
           <div class="top-actions">
             <button class="top-btn" title="Fullscreen" id="fullscreen-btn"><span class="material-icons">fullscreen</span></button>
+            <button class="top-btn" title="Back to Menu" id="menu-btn"><span class="material-icons">home</span></button>
           </div>
         </div>
       `;
@@ -39,6 +47,7 @@ export class TopBar {
           document.exitFullscreen();
         }
       });
+      this.container.querySelector('#menu-btn')?.addEventListener('click', () => this.menuCallback?.());
     } else {
       this.container.innerHTML = `
         <div class="top-bar">
@@ -54,6 +63,7 @@ export class TopBar {
             <button class="top-btn" title="Game Rules"><span class="material-icons">menu_book</span></button>
             <button class="top-btn" title="Settings"><span class="material-icons">settings</span></button>
             <button class="top-btn" title="Fullscreen" id="fullscreen-btn"><span class="material-icons">fullscreen</span></button>
+            <button class="top-btn" title="Back to Menu" id="menu-btn"><span class="material-icons">home</span></button>
           </div>
         </div>
       `;
@@ -64,6 +74,7 @@ export class TopBar {
           document.exitFullscreen();
         }
       });
+      this.container.querySelector('#menu-btn')?.addEventListener('click', () => this.menuCallback?.());
     }
   }
 }

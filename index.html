@@ -31,6 +31,8 @@
             overflow-y: auto;
             background: var(--bg-dark);
             border-right: 1px solid var(--surface-border);
+            position: relative;
+            z-index: 5001;
             z-index: 2;
             position: relative;
         }
@@ -326,6 +328,19 @@
             100% { box-shadow: 0 0 16px var(--el-glow), 0 -7px 30px rgba(255,152,0,0.55), 0 -5px 52px rgba(255,87,34,0.3), inset 0 0 12px rgba(255,152,0,0.22); }
         }
 
+        /* Aeterna — golden glow */
+        .player-card.active-turn.theme-aeterna,
+        .bottom-panel.theme-aeterna {
+            animation: aeterna-burn 3s ease-in-out infinite alternate;
+        }
+        @keyframes aeterna-burn {
+            0% { box-shadow: 0 0 10px var(--el-glow), 0 -4px 20px rgba(201,168,76,0.4), 0 -2px 40px rgba(122,100,32,0.2), inset 0 0 8px rgba(201,168,76,0.15); }
+            25% { box-shadow: 0 0 14px var(--el-glow), 0 -6px 28px rgba(201,168,76,0.5), 0 -4px 48px rgba(122,100,32,0.3), inset 0 0 10px rgba(201,168,76,0.2); }
+            50% { box-shadow: 0 0 18px var(--el-glow), 0 -8px 32px rgba(201,168,76,0.6), 0 -6px 56px rgba(122,100,32,0.35), inset 0 0 14px rgba(201,168,76,0.25); }
+            75% { box-shadow: 0 0 12px var(--el-glow), 0 -5px 24px rgba(201,168,76,0.45), 0 -3px 44px rgba(122,100,32,0.25), inset 0 0 9px rgba(201,168,76,0.18); }
+            100% { box-shadow: 0 0 16px var(--el-glow), 0 -7px 30px rgba(201,168,76,0.55), 0 -5px 52px rgba(122,100,32,0.3), inset 0 0 12px rgba(201,168,76,0.22); }
+        }
+
         /* bottom panel removed */
 
         /* Player cards */
@@ -410,6 +425,46 @@
             background: rgba(239, 83, 80, 0.15);
             color: var(--error); font-size: 10px; font-weight: 600;
         }
+        .power-track {
+            margin-top: 6px; padding: 6px 8px;
+            background: rgba(201, 168, 76, 0.06); border-radius: var(--radius-sm);
+            border: 1px solid rgba(201, 168, 76, 0.15);
+        }
+        .power-track-label {
+            display: flex; align-items: center; gap: 4px;
+            font-size: var(--font-size-xs); color: var(--aeterna-primary);
+            font-weight: 600; margin-bottom: 6px;
+        }
+        .power-track-label .material-icons { font-size: 14px; }
+        .power-balanced {
+            margin-left: auto; color: var(--success);
+            font-size: 10px; font-weight: 700;
+        }
+        .power-track-row {
+            display: flex; align-items: center; gap: 6px;
+            margin-bottom: 3px;
+        }
+        .power-track-name {
+            font-size: 10px; font-weight: 600; width: 34px;
+        }
+        .power-track-bar {
+            display: flex; gap: 2px; flex: 1;
+        }
+        .power-pip {
+            width: 14px; height: 8px; border-radius: 2px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: background 0.3s ease;
+        }
+        .power-pip.filled {
+            background: var(--pip-color);
+            border-color: var(--pip-color);
+            box-shadow: 0 0 4px var(--pip-color);
+        }
+        .power-track-value {
+            font-size: 11px; font-weight: 700; color: var(--text-secondary);
+            width: 12px; text-align: right;
+        }
         #char-card-overlay {
             position: fixed; inset: 0; z-index: 10000;
             display: flex; align-items: center; justify-content: center;
@@ -464,6 +519,7 @@
         .dialog-overlay.theme-earth .dialog-content { animation: earth-burn 3s ease-in-out infinite alternate; }
         .dialog-overlay.theme-water .dialog-content { animation: water-burn 3s ease-in-out infinite alternate; }
         .dialog-overlay.theme-fire .dialog-content { animation: fire-burn 3s ease-in-out infinite alternate; }
+        .dialog-overlay.theme-aeterna .dialog-content { animation: aeterna-burn 3s ease-in-out infinite alternate; }
         .dialog-visible .dialog-content {
             transform: scale(1);
         }
@@ -759,6 +815,7 @@
         .log-entry .log-player.earth { color: var(--earth-primary); }
         .log-entry .log-player.water { color: var(--water-primary); }
         .log-entry .log-player.fire { color: var(--fire-primary); }
+        .log-entry .log-player.aeterna { color: var(--aeterna-primary); }
         .log-turn-divider {
             text-align: center; font-size: var(--font-size-xs); color: var(--text-muted);
             padding: 4px 0; margin: 4px 0;
@@ -1257,6 +1314,13 @@
             letter-spacing: 2px;
             text-transform: uppercase;
             margin: 0;
+        }
+        .mode-select-label {
+            font-family: var(--font-display);
+            font-size: 0.9rem;
+            color: var(--text-muted, #888);
+            letter-spacing: 1px;
+            text-transform: uppercase;
         }
         .menu-buttons {
             display: flex;

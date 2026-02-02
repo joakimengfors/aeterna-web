@@ -15,18 +15,21 @@ const TOKEN_IMAGES: Record<TokenType, string> = {
   fire: 'assets/tokens/fire-token.png',
   lake: 'assets/tokens/lake-token.png',
   fog: 'assets/tokens/fog.png',
+  ocean: 'assets/tokens/lake-token.png', // placeholder for ocean
 };
 
 const ELEMENTAL_IMAGES: Record<ElementalType, string> = {
   earth: 'assets/meeples/earth-elemental.png',
   water: 'assets/meeples/water-elemental.png',
   fire: 'assets/meeples/fire-elemental.png',
+  aeterna: 'assets/meeples/earth-elemental.png', // no standee
 };
 
 const ELEMENTAL_NAMES: Record<ElementalType, string> = {
   earth: 'KAIJOM',
   water: 'NITSUJI',
   fire: 'KRAKATOA',
+  aeterna: 'AETERNA',
 };
 
 export class BoardRenderer {
@@ -264,6 +267,7 @@ export class BoardRenderer {
       earth: { primary: '#4caf50', glow: 'rgba(76, 175, 80, 0.5)' },
       water: { primary: '#29b6f6', glow: 'rgba(41, 182, 246, 0.5)' },
       fire: { primary: '#ff7043', glow: 'rgba(255, 112, 67, 0.5)' },
+      aeterna: { primary: '#c9a84c', glow: 'rgba(201, 168, 76, 0.5)' },
     };
 
     // Standees are inside a foreignObject matching the SVG viewBox (628x700),

@@ -13,6 +13,8 @@ export function checkWinConditions(state: GameState): ElementalType | null {
   if (checkWaterWin(state)) return 'water';
   // Fire wins: captured Earth, trapped Earth, or 12 fire tokens on board
   if (checkFireWin(state)) return 'fire';
+  // Aeterna wins: all powers equal at SOT, or deck exhausted (4-player only)
+  if (state.is4Player && checkAeternaWin(state)) return 'aeterna';
   return null;
 }
 
@@ -61,6 +63,21 @@ function checkFireWin(state: GameState): boolean {
   return false;
 }
 
+function checkAeternaWin(state: GameState): boolean {
+  // All 3 elemental powers are equal — ONLY checked at start of Aeterna's turn
+  if (state.currentPlayer === 'aeterna') {
+    const earthPower = state.getElementalPower('earth');
+    const waterPower = state.getElementalPower('water');
+    const firePower = state.getElementalPower('fire');
+    if (earthPower === waterPower && waterPower === firePower) return true;
+  }
+
+  // Special ability deck is exhausted (can happen on any turn)
+  if (state.specialDeck.isDeckExhausted) return true;
+
+  return false;
+}
+
 /** Check if an elemental is trapped (no legal moves at all) */
 export function isTrapped(state: GameState, type: ElementalType): boolean {
   const player = state.getPlayer(type);
@@ -74,6 +91,9 @@ export function isTrapped(state: GameState, type: ElementalType): boolean {
 
 function canElementalEnter(state: GameState, type: ElementalType, hexId: number): boolean {
   const hex = state.getHex(hexId);
+
+  // Ocean tiles are completely out of bounds
+  if (hex.tokens.includes('ocean')) return false;
 
   // Can't enter stone minion hex (except earth passing through, but for "trapped" we check end positions)
   if (hex.stoneMinion) return false;

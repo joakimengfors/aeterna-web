@@ -28,13 +28,13 @@ function init() {
   let network: NetworkController | null = null;
 
   const menu = new MainMenu(menuEl, {
-    onLocalPlay: () => {
+    onLocalPlay: (playerCount: number) => {
       menu.hide();
       gameLayout.style.display = '';
-      startLocalGame();
+      startLocalGame(playerCount);
     },
 
-    onHostGame: async () => {
+    onHostGame: async (_playerCount: number) => {
       try {
         network = new NetworkController(getSignalingUrl(), 'host');
         network.onLobbyUpdate((lobby) => {
@@ -102,8 +102,8 @@ function init() {
     },
   });
 
-  function startLocalGame() {
-    const state = new GameState();
+  function startLocalGame(playerCount = 3) {
+    const state = new GameState(playerCount);
     const topBarEl = document.getElementById('top-bar')!;
     const leftPanelEl = document.getElementById('left-panel')!;
     const mapAreaEl = document.getElementById('map-area')!;

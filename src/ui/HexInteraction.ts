@@ -16,7 +16,7 @@ import { getActionsForElemental } from '../game/types';
 import { getNeighbors, getLineHexes, isShore, ALL_HEX_IDS, getShortestPath, getPixelPos } from '../game/HexGrid';
 import type { NetworkController } from '../network/NetworkController';
 
-const NAMES: Record<ElementalType, string> = { earth: 'Kaijom', water: 'Nitsuji', fire: 'Krakatoa' };
+const NAMES: Record<ElementalType, string> = { earth: 'Kaijom', water: 'Nitsuji', fire: 'Krakatoa', aeterna: 'Aeterna' };
 
 export class HexInteraction {
   private state: GameState;
@@ -89,6 +89,7 @@ export class HexInteraction {
     }
 
     this.board.setHexClickHandler((hexId) => this.onHexClick(hexId));
+    this.topBar.onMenuClick(() => this.returnToMenu());
     this.showTurnBanner(() => this.renderAll());
   }
 
@@ -169,8 +170,10 @@ export class HexInteraction {
     // Check if game is over
     if (this.state.winner) {
       this.board.render(this.state);
-      this.dialog.showVictory(this.state, () => {
-        this.returnToMenu();
+      this.dialog.showVictory(this.state, {
+        onRematch: () => this.returnToMenu(),
+        onReturnToMenu: () => this.returnToMenu(),
+        onReturnToLobby: this.network ? () => this.returnToMenu() : undefined,
       });
       return;
     }
@@ -333,6 +336,7 @@ export class HexInteraction {
       'uproot': 'Uproot', 'raise-mountain': 'Raise Mountain', 'landslide': 'Landslide', 'sprout': 'Sprout',
       'mosey': 'Mosey', 'conjure': 'Conjure Lakes', 'surf': 'Ocean Surf', 'rematerialize': 'Re-Materialize',
       'smoke-dash': 'Smoke Dash', 'flame-dash': 'Flame Dash', 'firestorm': 'Firestorm', 'firewall': 'Firewall',
+      'tides-embrace': "Tide's Embrace", 'ash-to-lush': 'Ash to Lush', 'bark-and-bough': 'Bark and Bough', 'aeternas-favor': "Aeterna's Favor",
       'special': 'Special Ability',
     };
     return map[actionId] || actionId;
@@ -368,6 +372,7 @@ export class HexInteraction {
       case 'earth': return `Move Stone Minion 1 hex`;
       case 'water': return `Move ${name} 1 hex, or teleport to a Lake or Fog`;
       case 'fire': return `Place Fire under ${name} or adjacent to existing fire`;
+      case 'aeterna': return 'Pick a token to duplicate';
       default: return 'Use Start of Turn ability';
     }
   }
@@ -397,6 +402,11 @@ export class HexInteraction {
 
     if (actionId === 'special') {
       this.handleSpecialAbility();
+      return;
+    }
+
+    if (actionId === 'aeternas-favor') {
+      this.handleAeternasFavor();
       return;
     }
 
@@ -640,7 +650,47 @@ export class HexInteraction {
     }
 
     if (this.state.phase === 'EXECUTING' && !this.selectedAction) {
-      // SOT execution — show confirm dialog
+      // SOT execution
+      const type = this.state.currentPlayer;
+
+      // Aeterna SOT: 2-step (source, then destination)
+      if (type === 'aeterna') {
+        if (this.currentStep === 0) {
+          // Step 1: picked source token hex
+          this.actionTargets = [hexId];
+          this.currentStep = 1;
+          this.board.highlightSelected(hexId);
+          const destTargets = this.executor.getAeternaSOTDestTargets(hexId);
+          this.validTargets = destTargets;
+          this.state.stepInstruction = 'Choose an empty hex within 2 range';
+          this.board.render(this.state);
+          this.board.highlightValidTargets(destTargets, 'aeterna');
+          this.board.highlightSelected(hexId);
+          this.topBar.render(this.state);
+          this.dialog.showInfo('Duplicate Token', 'Choose destination hex', () => this.onUndo());
+          return;
+        } else {
+          // Step 2: picked destination — confirm
+          this.actionTargets.push(hexId);
+          this.board.highlightSelected(hexId);
+          this.state.phase = 'CONFIRM';
+          this.topBar.render(this.state);
+          this.dialog.showConfirm(
+            `Execute <strong>Start of Turn</strong> — Duplicate token?`,
+            () => {
+              this.dialog.hide();
+              this.executor.executeAeternaSOT(this.actionTargets[0], this.actionTargets[1]);
+              if (this.checkWin()) return;
+              this.board.render(this.state);
+              this.finishSOT();
+            },
+            () => this.onUndo(),
+          );
+          return;
+        }
+      }
+
+      // Standard 1-step SOT
       this.actionTargets = [hexId];
       this.board.highlightSelected(hexId);
       this.state.phase = 'CONFIRM';
@@ -650,7 +700,6 @@ export class HexInteraction {
         () => {
           this.dialog.hide();
           // Queue SOT movement animation
-          const type = this.state.currentPlayer;
           if (type === 'earth') {
             const minionHex = this.state.getStoneMinionHex();
             if (minionHex !== null) this.queueMoveAnimation('minion', minionHex, hexId);
@@ -695,6 +744,15 @@ export class HexInteraction {
         return;
       case 'special':
         this.handleSpecialStep(hexId);
+        return;
+      case 'tides-embrace':
+        this.handleTidesEmbraceStep(hexId);
+        return;
+      case 'ash-to-lush':
+        this.handleAshToLushStep(hexId);
+        return;
+      case 'bark-and-bough':
+        this.handleBarkAndBoughStep(hexId);
         return;
     }
 
@@ -973,6 +1031,137 @@ export class HexInteraction {
       this.topBar.render(this.state);
       this.showConfirmDialog();
     });
+  }
+
+  // ==========================================
+  // AETERNA ACTION HANDLERS
+  // ==========================================
+
+  private handleAeternasFavor() {
+    const targets = this.executor.getAeternasFavorTargets();
+    if (targets.length === 0) {
+      this.dialog.showInfo("Aeterna's Favor", 'No elementals have blocked actions.');
+      this.selectedAction = null;
+      this.state.phase = 'CHOOSE_ACTION';
+      this.renderAll();
+      return;
+    }
+
+    const choices = targets.map(t => ({
+      text: `${NAMES[t.type]} — free ${this.getActionDisplayName(t.blockedAction)}`,
+      primary: true,
+      callback: () => {
+        const result = this.executor.executeAeternasFavor(t.type);
+        this.state.addLog(result);
+        this.turnMgr.setActionMarker('aeternas-favor');
+        if (this.checkWin()) return;
+        this.finishTurn();
+      },
+    }));
+
+    this.dialog.showChoice("Aeterna's Favor", 'Choose an elemental to free from cooldown:', choices);
+  }
+
+  private handleTidesEmbraceStep(hexId: HexId) {
+    const hex = this.state.getHex(hexId);
+    const aeterna = this.state.getPlayer('aeterna');
+    const supply = aeterna.supplies.ocean ?? 0;
+
+    if (hex.tokens.includes('ocean')) {
+      // Moving existing ocean — step 1: pick source
+      this.actionTargets = [hexId];
+      this.currentStep = 1;
+      const dests = this.executor.getTidesEmbraceMoveDests(hexId);
+      this.validTargets = dests;
+      this.state.stepInstruction = 'Choose destination shore hex for ocean tile';
+      this.board.render(this.state);
+      this.board.highlightValidTargets(dests, 'aeterna');
+      this.board.highlightSelected(hexId);
+      this.topBar.render(this.state);
+      this.dialog.showInfo("Tide's Embrace", 'Choose destination', () => this.onUndo());
+    } else if (this.currentStep === 1) {
+      // Step 2: destination for move
+      this.actionTargets.push(hexId);
+      this.state.phase = 'CONFIRM';
+      this.board.highlightSelected(hexId);
+      this.topBar.render(this.state);
+      this.showConfirmDialog();
+    } else {
+      // Placing from supply
+      this.actionTargets = [hexId];
+      this.state.phase = 'CONFIRM';
+      this.board.highlightSelected(hexId);
+      this.topBar.render(this.state);
+      this.showConfirmDialog();
+    }
+  }
+
+  private handleAshToLushStep(hexId: HexId) {
+    const fire = this.state.getPlayer('fire');
+    const supply = fire.supplies.fire ?? 0;
+    const hex = this.state.getHex(hexId);
+
+    if (supply <= 0 && hex.tokens.includes('fire')) {
+      // Moving existing fire — step 1: pick source
+      this.actionTargets = [hexId];
+      this.currentStep = 1;
+      const dests = this.executor.getAshToLushMoveDests(hexId);
+      this.validTargets = dests;
+      this.state.stepInstruction = 'Choose destination for fire token';
+      this.board.render(this.state);
+      this.board.highlightValidTargets(dests, 'aeterna');
+      this.board.highlightSelected(hexId);
+      this.topBar.render(this.state);
+      this.dialog.showInfo('Ash to Lush', 'Choose destination', () => this.onUndo());
+    } else if (this.currentStep === 1) {
+      // Step 2: destination for move
+      this.actionTargets.push(hexId);
+      this.state.phase = 'CONFIRM';
+      this.board.highlightSelected(hexId);
+      this.topBar.render(this.state);
+      this.showConfirmDialog();
+    } else {
+      // Placing from supply
+      this.actionTargets = [hexId];
+      this.state.phase = 'CONFIRM';
+      this.board.highlightSelected(hexId);
+      this.topBar.render(this.state);
+      this.showConfirmDialog();
+    }
+  }
+
+  private handleBarkAndBoughStep(hexId: HexId) {
+    const earth = this.state.getPlayer('earth');
+    const supply = earth.supplies.forest ?? 0;
+    const hex = this.state.getHex(hexId);
+
+    if (supply <= 0 && hex.tokens.includes('forest')) {
+      // Moving existing forest — step 1: pick source
+      this.actionTargets = [hexId];
+      this.currentStep = 1;
+      const dests = this.executor.getBarkAndBoughMoveDests(hexId);
+      this.validTargets = dests;
+      this.state.stepInstruction = 'Choose destination for forest token';
+      this.board.render(this.state);
+      this.board.highlightValidTargets(dests, 'aeterna');
+      this.board.highlightSelected(hexId);
+      this.topBar.render(this.state);
+      this.dialog.showInfo('Bark and Bough', 'Choose destination', () => this.onUndo());
+    } else if (this.currentStep === 1) {
+      // Step 2: destination for move
+      this.actionTargets.push(hexId);
+      this.state.phase = 'CONFIRM';
+      this.board.highlightSelected(hexId);
+      this.topBar.render(this.state);
+      this.showConfirmDialog();
+    } else {
+      // Placing from supply
+      this.actionTargets = [hexId];
+      this.state.phase = 'CONFIRM';
+      this.board.highlightSelected(hexId);
+      this.topBar.render(this.state);
+      this.showConfirmDialog();
+    }
   }
 
   // ==========================================
@@ -1322,6 +1511,14 @@ export class HexInteraction {
         return `Choose a Fog token to swap with ${name}`;
       case 'sprout':
         return 'Choose a Lake adjacent to a Forest to convert';
+      case 'tides-embrace':
+        return 'Place or move an ocean tile on a shore hex';
+      case 'ash-to-lush':
+        return 'Place or move a fire token';
+      case 'bark-and-bough':
+        return 'Place or move a forest token';
+      case 'aeternas-favor':
+        return 'Choose an elemental to free from cooldown';
       default:
         return 'Click a highlighted hex on the map';
     }
@@ -1334,8 +1531,10 @@ export class HexInteraction {
       this.state.winner = winner;
       this.syncState();
       this.board.render(this.state);
-      this.dialog.showVictory(this.state, () => {
-        this.returnToMenu();
+      this.dialog.showVictory(this.state, {
+        onRematch: () => this.returnToMenu(),
+        onReturnToMenu: () => this.returnToMenu(),
+        onReturnToLobby: this.network ? () => this.returnToMenu() : undefined,
       });
       return true;
     }

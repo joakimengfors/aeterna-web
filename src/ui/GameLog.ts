@@ -9,6 +9,7 @@ const ELEMENTAL_NAMES: Record<ElementalType, string> = {
   earth: 'Kaijom',
   water: 'Nitsuji',
   fire: 'Krakatoa',
+  aeterna: 'Aeterna',
 };
 
 export class GameLog {
@@ -36,7 +37,7 @@ export class GameLog {
             const isCurrent = i === state.currentPlayerIndex;
             return `
               <div class="turn-order-pip ${type} theme-${type} ${isCurrent ? 'current' : ''}">
-                <img src="assets/characters/elementals_illustration (${type === 'earth' ? 'earth' : type === 'water' ? 'water' : 'fire'}).png"
+                <img src="assets/characters/elementals_illustration (${type}).png"
                      alt="${type}" style="width:20px;height:20px;border-radius:50%;object-fit:cover;">
               </div>
               ${i < state.turnOrder.length - 1 ? '<span class="turn-order-arrow"><span class="material-icons">chevron_right</span></span>' : ''}

@@ -30,6 +30,7 @@ export class ActionExecutor {
       case 'earth': return this.getStoneMinonMoveTargets();
       case 'water': return this.getWaterSOTTargets();
       case 'fire': return this.getFireSOTTargets();
+      case 'aeterna': return this.getAeternaSOTSourceTargets();
     }
   }
 
@@ -38,7 +39,7 @@ export class ActionExecutor {
     if (minionHex === null) return [];
     const neighbors = getNeighbors(minionHex);
     const earthHex = this.state.getPlayer('earth').hexId;
-    return neighbors.filter(n => n !== earthHex); // Can't move onto Earth
+    return neighbors.filter(n => n !== earthHex && !this.state.isOceanHex(n));
   }
 
   private getWaterSOTTargets(): HexId[] {
@@ -55,7 +56,7 @@ export class ActionExecutor {
     for (const [id, hex] of this.state.board) {
       if (id === water.hexId) continue;
       if (hex.tokens.includes('lake') || hex.tokens.includes('fog')) {
-        if (!hex.tokens.includes('mountain') && !hex.stoneMinion) {
+        if (!hex.tokens.includes('mountain') && !hex.tokens.includes('ocean') && !hex.stoneMinion) {
           targets.add(id);
         }
       }
@@ -95,6 +96,7 @@ export class ActionExecutor {
       case 'earth': this.executeEarthSOT(targetHex); break;
       case 'water': this.executeWaterSOT(targetHex); break;
       case 'fire': this.executeFireSOT(targetHex); break;
+      case 'aeterna': break; // Aeterna SOT is 2-step, handled via executeAeternaSOT
     }
     this.state.sotUsed = true;
 
@@ -177,6 +179,11 @@ export class ActionExecutor {
       case 'flame-dash': return this.getFlameDashTargets();
       case 'firestorm': return this.getFirestormPlacementTargets();
       case 'firewall': return this.getFirewallDirectionHexes();
+      // Aeterna
+      case 'tides-embrace': return this.getTidesEmbraceTargets();
+      case 'ash-to-lush': return this.getAshToLushTargets();
+      case 'bark-and-bough': return this.getBarkAndBoughTargets();
+      case 'aeternas-favor': return []; // Dialog-based, no hex targeting
       // Special
       case 'special': return [];
       default: return [];
@@ -198,6 +205,11 @@ export class ActionExecutor {
       case 'flame-dash': return this.executeFlameDash(targets[0]);
       case 'firestorm': return this.executeFirestorm(targets);
       case 'firewall': return this.executeFirewall(targets[0]);
+      // Aeterna
+      case 'tides-embrace': return this.executeTidesEmbrace(targets);
+      case 'ash-to-lush': return this.executeAshToLush(targets);
+      case 'bark-and-bough': return this.executeBarkAndBough(targets);
+      case 'aeternas-favor': return ''; // Handled via executeAeternasFavor
       default: return '';
     }
   }
@@ -750,6 +762,264 @@ export class ActionExecutor {
   }
 
   // ==========================================
+  // AETERNA ACTIONS
+  // ==========================================
+
+  /** SOT step 1: get source hexes with duplicatable tokens */
+  private getAeternaSOTSourceTargets(): HexId[] {
+    const targets: HexId[] = [];
+    for (const [id, hex] of this.state.board) {
+      for (const token of hex.tokens) {
+        if (token === 'fog' || token === 'ocean') continue;
+        const owner = this.state.getTokenOwner(token);
+        if (!owner) continue;
+        const supply = this.state.getPlayer(owner).supplies[token] ?? 0;
+        if (supply <= 0) continue;
+        // Check if there's at least 1 valid empty hex within 2 range
+        if (this.getAeternaSOTDestTargets(id).length > 0) {
+          targets.push(id);
+          break; // one per hex is enough
+        }
+      }
+    }
+    return targets;
+  }
+
+  /** SOT step 2: get destination hexes within 2 range of source */
+  getAeternaSOTDestTargets(sourceHex: HexId): HexId[] {
+    const targets: HexId[] = [];
+    for (const [id] of this.state.board) {
+      if (hexDistance(sourceHex, id) <= 2 && this.state.isHexEmpty(id) && !this.state.isOceanHex(id)) {
+        targets.push(id);
+      }
+    }
+    return targets;
+  }
+
+  /** Execute Aeterna SOT: duplicate token from source to dest */
+  executeAeternaSOT(sourceHex: HexId, destHex: HexId) {
+    const hex = this.state.getHex(sourceHex);
+    // Pick the first duplicatable token on source
+    const token = hex.tokens.find(t => {
+      if (t === 'fog' || t === 'ocean') return false;
+      const owner = this.state.getTokenOwner(t);
+      if (!owner) return false;
+      return (this.state.getPlayer(owner).supplies[t] ?? 0) > 0;
+    });
+    if (!token) return;
+
+    const owner = this.state.getTokenOwner(token)!;
+    if (this.state.takeFromSupply(owner, token)) {
+      this.state.addToken(destHex, token);
+    }
+    this.state.sotUsed = true;
+    this.state.addLog(`Aeterna duplicated ${token} from hex ${sourceHex} to hex ${destHex}.`);
+
+    const winner = checkWinConditions(this.state);
+    if (winner) this.state.winner = winner;
+  }
+
+  /** Tide's Embrace: place or move ocean tile on empty shore hex */
+  private getTidesEmbraceTargets(): HexId[] {
+    const aeterna = this.state.getPlayer('aeterna');
+    const supply = aeterna.supplies.ocean ?? 0;
+    const targets: HexId[] = [];
+
+    if (supply > 0) {
+      // Place: empty shore hexes
+      for (const [id] of this.state.board) {
+        if (isShore(id) && this.state.isHexEmpty(id)) {
+          targets.push(id);
+        }
+      }
+    }
+
+    // Move: existing ocean tile hexes (always available as source selection)
+    for (const [id, hex] of this.state.board) {
+      if (hex.tokens.includes('ocean')) targets.push(id);
+    }
+
+    return [...new Set(targets)];
+  }
+
+  /** Get destination targets for moving an existing ocean tile */
+  getTidesEmbraceMoveDests(sourceHex: HexId): HexId[] {
+    const targets: HexId[] = [];
+    for (const [id] of this.state.board) {
+      if (id === sourceHex) continue;
+      if (isShore(id) && this.state.isHexEmpty(id)) {
+        targets.push(id);
+      }
+    }
+    return targets;
+  }
+
+  executeTidesEmbrace(targets: HexId[]): string {
+    const aeterna = this.state.getPlayer('aeterna');
+
+    if (targets.length === 1) {
+      // Placing from supply
+      if (this.state.takeFromSupply('aeterna', 'ocean')) {
+        this.state.addToken(targets[0], 'ocean');
+        this.state.addLog(`Aeterna placed Ocean on hex ${targets[0]}.`);
+        return `Tide's Embrace — placed Ocean on hex ${targets[0]}`;
+      }
+    } else if (targets.length === 2) {
+      // Moving existing ocean
+      this.state.removeToken(targets[0], 'ocean');
+      this.state.addToken(targets[1], 'ocean');
+      this.state.addLog(`Aeterna moved Ocean from hex ${targets[0]} to hex ${targets[1]}.`);
+      return `Tide's Embrace — moved Ocean from hex ${targets[0]} to hex ${targets[1]}`;
+    }
+
+    return "Tide's Embrace";
+  }
+
+  /** Ash to Lush: place fire (from Fire's supply) or move existing fire */
+  private getAshToLushTargets(): HexId[] {
+    const fire = this.state.getPlayer('fire');
+    const supply = fire.supplies.fire ?? 0;
+
+    if (supply > 0) {
+      // Place on empty hexes
+      const targets: HexId[] = [];
+      for (const [id] of this.state.board) {
+        if (this.state.isHexEmpty(id) && !this.state.isOceanHex(id)) {
+          targets.push(id);
+        }
+      }
+      return targets;
+    } else {
+      // Move existing fire tokens (source selection)
+      const targets: HexId[] = [];
+      for (const [id, hex] of this.state.board) {
+        if (hex.tokens.includes('fire')) targets.push(id);
+      }
+      return targets;
+    }
+  }
+
+  /** Get destination for moving a fire token */
+  getAshToLushMoveDests(sourceHex: HexId): HexId[] {
+    const targets: HexId[] = [];
+    for (const [id] of this.state.board) {
+      if (id === sourceHex) continue;
+      if (this.state.isHexEmpty(id) && !this.state.isOceanHex(id)) {
+        targets.push(id);
+      }
+    }
+    return targets;
+  }
+
+  executeAshToLush(targets: HexId[]): string {
+    const fire = this.state.getPlayer('fire');
+    const supply = fire.supplies.fire ?? 0;
+
+    if (supply > 0 && targets.length === 1) {
+      if (this.state.takeFromSupply('fire', 'fire')) {
+        this.state.addToken(targets[0], 'fire');
+      }
+      this.state.addLog(`Aeterna placed Fire on hex ${targets[0]}.`);
+
+      const winner = checkWinConditions(this.state);
+      if (winner) this.state.winner = winner;
+
+      return `Ash to Lush — placed Fire on hex ${targets[0]}`;
+    } else if (targets.length === 2) {
+      this.state.removeToken(targets[0], 'fire');
+      this.state.addToken(targets[1], 'fire');
+      this.state.addLog(`Aeterna moved Fire from hex ${targets[0]} to hex ${targets[1]}.`);
+
+      const winner = checkWinConditions(this.state);
+      if (winner) this.state.winner = winner;
+
+      return `Ash to Lush — moved Fire from hex ${targets[0]} to hex ${targets[1]}`;
+    }
+    return 'Ash to Lush';
+  }
+
+  /** Bark and Bough: place forest (from Earth's supply) or move existing forest */
+  private getBarkAndBoughTargets(): HexId[] {
+    const earth = this.state.getPlayer('earth');
+    const supply = earth.supplies.forest ?? 0;
+
+    if (supply > 0) {
+      const targets: HexId[] = [];
+      for (const [id] of this.state.board) {
+        if (this.state.isHexEmpty(id) && !this.state.isOceanHex(id)) {
+          targets.push(id);
+        }
+      }
+      return targets;
+    } else {
+      const targets: HexId[] = [];
+      for (const [id, hex] of this.state.board) {
+        if (hex.tokens.includes('forest')) targets.push(id);
+      }
+      return targets;
+    }
+  }
+
+  /** Get destination for moving a forest token */
+  getBarkAndBoughMoveDests(sourceHex: HexId): HexId[] {
+    const targets: HexId[] = [];
+    for (const [id] of this.state.board) {
+      if (id === sourceHex) continue;
+      if (this.state.isHexEmpty(id) && !this.state.isOceanHex(id)) {
+        targets.push(id);
+      }
+    }
+    return targets;
+  }
+
+  executeBarkAndBough(targets: HexId[]): string {
+    const earth = this.state.getPlayer('earth');
+    const supply = earth.supplies.forest ?? 0;
+
+    if (supply > 0 && targets.length === 1) {
+      if (this.state.takeFromSupply('earth', 'forest')) {
+        this.state.addToken(targets[0], 'forest');
+      }
+      this.state.addLog(`Aeterna placed Forest on hex ${targets[0]}.`);
+
+      const winner = checkWinConditions(this.state);
+      if (winner) this.state.winner = winner;
+
+      return `Bark and Bough — placed Forest on hex ${targets[0]}`;
+    } else if (targets.length === 2) {
+      this.state.removeToken(targets[0], 'forest');
+      this.state.addToken(targets[1], 'forest');
+      this.state.addLog(`Aeterna moved Forest from hex ${targets[0]} to hex ${targets[1]}.`);
+
+      const winner = checkWinConditions(this.state);
+      if (winner) this.state.winner = winner;
+
+      return `Bark and Bough — moved Forest from hex ${targets[0]} to hex ${targets[1]}`;
+    }
+    return 'Bark and Bough';
+  }
+
+  /** Aeterna's Favor: get elementals that have a blocked action */
+  getAeternasFavorTargets(): { type: ElementalType; blockedAction: ActionId }[] {
+    const results: { type: ElementalType; blockedAction: ActionId }[] = [];
+    for (const type of ['earth', 'water', 'fire'] as ElementalType[]) {
+      const player = this.state.getPlayer(type);
+      if (player.actionMarker) {
+        results.push({ type, blockedAction: player.actionMarker });
+      }
+    }
+    return results;
+  }
+
+  executeAeternasFavor(targetType: ElementalType): string {
+    const player = this.state.getPlayer(targetType);
+    const action = player.actionMarker;
+    player.actionMarker = null;
+    this.state.addLog(`Aeterna's Favor — removed ${action} cooldown from ${targetType}.`);
+    return `Aeterna's Favor — freed ${targetType}'s ${action}`;
+  }
+
+  // ==========================================
   // SPECIAL ABILITY EXECUTION
   // ==========================================
 
@@ -768,6 +1038,7 @@ export class ActionExecutor {
 
   private canEarthEnter(hexId: HexId): boolean {
     const hex = this.state.getHex(hexId);
+    if (hex.tokens.includes('ocean')) return false;
     if (hex.tokens.includes('fire')) return false;
     // Mountains and stone minion can be entered (passed through) but not ended on
     return true;
@@ -775,6 +1046,7 @@ export class ActionExecutor {
 
   private canEarthPassThrough(hexId: HexId): boolean {
     const hex = this.state.getHex(hexId);
+    if (hex.tokens.includes('ocean')) return false;
     if (hex.tokens.includes('fire')) return false;
     // Can pass through mountains and stone minion (but can't end on them)
     // Fog stops movement
@@ -785,6 +1057,7 @@ export class ActionExecutor {
   /** Check if Earth can END on a hex (not mountains, not stone minion, not fire) */
   private canEarthEnd(hexId: HexId): boolean {
     const hex = this.state.getHex(hexId);
+    if (hex.tokens.includes('ocean')) return false;
     if (hex.tokens.includes('fire')) return false;
     if (hex.tokens.includes('mountain')) return false;
     if (hex.stoneMinion) return false;
@@ -793,6 +1066,7 @@ export class ActionExecutor {
 
   private canWaterEnter(hexId: HexId): boolean {
     const hex = this.state.getHex(hexId);
+    if (hex.tokens.includes('ocean')) return false;
     if (hex.tokens.includes('mountain')) return false;
     if (hex.stoneMinion) return false;
     return true;
@@ -800,6 +1074,7 @@ export class ActionExecutor {
 
   private canFireEnd(hexId: HexId): boolean {
     const hex = this.state.getHex(hexId);
+    if (hex.tokens.includes('ocean')) return false;
     if (hex.tokens.includes('mountain')) return false;
     if (hex.tokens.includes('lake')) return false;
     if (hex.stoneMinion) return false;

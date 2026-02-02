@@ -9,6 +9,7 @@ const SOT_HTML: Record<ElementalType, string> = {
   earth: 'Move the <img class="token-inline" src="assets/meeples/stone-minion.png" alt="Stone Minion"> Stone Minion up to 1 hex. It can capture <img class="token-inline" src="assets/meeples/water-elemental.png" alt="Nitsuji"> Nitsuji.',
   water: 'Move <img class="token-inline" src="assets/meeples/water-elemental.png"> up to 1 hex <span class="or-text">or</span> teleport to any hex containing a <img class="token-inline" src="assets/tokens/lake-token.png"> or <img class="token-inline" src="assets/tokens/fog.png">.',
   fire: 'Place a <img class="token-inline" src="assets/tokens/fire-token.png"> under you <span class="or-text">or</span> place a <img class="token-inline" src="assets/tokens/fire-token.png"> on an empty hex next to an existing <img class="token-inline" src="assets/tokens/fire-token.png">.',
+  aeterna: 'Duplicate a token on the board — pick a token, then choose an empty hex within 2 range.',
 };
 
 const ACTION_HTML: Record<string, string> = {
@@ -24,6 +25,10 @@ const ACTION_HTML: Record<string, string> = {
   'flame-dash': '<img class="meeple-inline" src="assets/meeples/fire-elemental.png"> 3 in a line.<br><br>Place <img class="token-inline" src="assets/tokens/fire-token.png"> under you.',
   'firestorm': 'Add <img class="token-inline" src="assets/tokens/fire-token.png"> to up to 3 <img class="token-inline" src="assets/tokens/fire-token.png"> groups. <img class="meeple-inline" src="assets/meeples/fire-elemental.png"> freely through <img class="token-inline" src="assets/tokens/fire-token.png">.',
   'firewall': 'Place 3 <img class="token-inline" src="assets/tokens/fire-token.png"> in a line from <img class="meeple-inline" src="assets/meeples/fire-elemental.png">.',
+  'tides-embrace': 'Place an ocean tile on an empty shore hex, or move an existing ocean tile.',
+  'ash-to-lush': 'Place a <img class="token-inline" src="assets/tokens/fire-token.png"> from Fire\'s supply on an empty hex.',
+  'bark-and-bough': 'Place a <img class="token-inline" src="assets/tokens/forest-token.png"> from Earth\'s supply on an empty hex.',
+  'aeternas-favor': 'Remove the action cooldown from one Elemental\'s ability.',
 };
 
 const ABILITY_ICONS: Record<string, { image: string; pos: string }> = {
@@ -237,14 +242,15 @@ export class GameDialog {
     this.show();
   }
 
-  showVictory(state: GameState, onRematch: () => void) {
+  showVictory(state: GameState, options: { onRematch: () => void; onReturnToMenu: () => void; onReturnToLobby?: () => void }) {
     this.cancelCallback = null;
     const winner = state.winner!;
-    const names: Record<ElementalType, string> = { earth: 'Kaijom', water: 'Nitsuji', fire: 'Krakatoa' };
+    const names: Record<ElementalType, string> = { earth: 'Kaijom', water: 'Nitsuji', fire: 'Krakatoa', aeterna: 'Aeterna' };
     const portraits: Record<ElementalType, string> = {
       earth: 'assets/characters/elementals_illustration (earth).png',
       water: 'assets/characters/elementals_illustration (water).png',
       fire: 'assets/characters/elementals_illustration (fire).png',
+      aeterna: 'assets/characters/elementals_illustration (aeterna).png',
     };
 
     // Determine win reason
@@ -253,7 +259,7 @@ export class GameDialog {
     // Gather stats
     const turns = state.turnNumber;
     const totalMoves = state.log.length;
-    const tokenStats: Record<ElementalType, number> = { earth: 0, water: 0, fire: 0 };
+    const tokenStats: Record<ElementalType, number> = { earth: 0, water: 0, fire: 0, aeterna: 0 };
     for (const hex of state.board.values()) {
       tokenStats.earth += hex.tokens.filter(t => t === 'forest' || t === 'mountain').length;
       tokenStats.water += hex.tokens.filter(t => t === 'lake' || t === 'fog').length;
@@ -295,12 +301,22 @@ export class GameDialog {
       </div>
       <div class="dialog-actions victory-actions">
         <button class="dialog-btn dialog-btn-primary" data-idx="rematch">Rematch</button>
+        ${options.onReturnToLobby ? '<button class="dialog-btn dialog-btn-secondary" data-idx="lobby">Return to Lobby</button>' : ''}
+        <button class="dialog-btn dialog-btn-secondary" data-idx="menu">Return to Menu</button>
       </div>
     `;
 
     this.content.querySelector('[data-idx="rematch"]')!.addEventListener('click', () => {
       this.hide();
-      onRematch();
+      options.onRematch();
+    });
+    this.content.querySelector('[data-idx="lobby"]')?.addEventListener('click', () => {
+      this.hide();
+      options.onReturnToLobby!();
+    });
+    this.content.querySelector('[data-idx="menu"]')!.addEventListener('click', () => {
+      this.hide();
+      options.onReturnToMenu();
     });
 
     // Blocking overlay with backdrop
@@ -329,11 +345,18 @@ export class GameDialog {
       if (state.countTokensOnBoard('fire') >= 12) return 'Spread 12 Fire tokens';
       return 'Kaijom was trapped';
     }
+    if (winner === 'aeterna') {
+      const ep = state.getElementalPower('earth');
+      const wp = state.getElementalPower('water');
+      const fp = state.getElementalPower('fire');
+      if (ep === wp && wp === fp) return 'All elemental powers balanced';
+      return 'Special ability deck exhausted';
+    }
     return 'Victory';
   }
 
   setTheme(elementalType: ElementalType) {
-    this.overlay.classList.remove('theme-earth', 'theme-water', 'theme-fire');
+    this.overlay.classList.remove('theme-earth', 'theme-water', 'theme-fire', 'theme-aeterna');
     this.overlay.classList.add(`theme-${elementalType}`);
   }
 

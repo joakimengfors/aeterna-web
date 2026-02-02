@@ -208,6 +208,11 @@ export class GameRoom {
       case 'start-game':
         if (fromId !== this.hostId) return;
         this.started = true;
+        this.broadcast({
+          type: 'start-game',
+          state: msg.state,
+          playerAssignments: msg.playerAssignments,
+        }, fromId);
         break;
     }
   }

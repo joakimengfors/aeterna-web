@@ -55,6 +55,15 @@
     --fire-border: rgba(255, 112, 67, 0.25);
     --fire-gradient: linear-gradient(135deg, #d84315 0%, #ff7043 100%);
 
+    /* Aeterna / The Island */
+    --aeterna-primary: #c9a84c;
+    --aeterna-secondary: #e8d48b;
+    --aeterna-dark: #7a6420;
+    --aeterna-glow: rgba(201, 168, 76, 0.3);
+    --aeterna-bg: rgba(201, 168, 76, 0.08);
+    --aeterna-border: rgba(201, 168, 76, 0.25);
+    --aeterna-gradient: linear-gradient(135deg, #7a6420 0%, #c9a84c 100%);
+
     /* Token colors */
     --token-mountain: #78909c;
     --token-forest: #66bb6a;
@@ -163,3 +172,4 @@ body {
 .theme-earth { --el-primary: var(--earth-primary); --el-secondary: var(--earth-secondary); --el-dark: var(--earth-dark); --el-glow: var(--earth-glow); --el-bg: var(--earth-bg); --el-border: var(--earth-border); --el-gradient: var(--earth-gradient); }
 .theme-water { --el-primary: var(--water-primary); --el-secondary: var(--water-secondary); --el-dark: var(--water-dark); --el-glow: var(--water-glow); --el-bg: var(--water-bg); --el-border: var(--water-border); --el-gradient: var(--water-gradient); }
 .theme-fire { --el-primary: var(--fire-primary); --el-secondary: var(--fire-secondary); --el-dark: var(--fire-dark); --el-glow: var(--fire-glow); --el-bg: var(--fire-bg); --el-border: var(--fire-border); --el-gradient: var(--fire-gradient); }
+.theme-aeterna { --el-primary: var(--aeterna-primary); --el-secondary: var(--aeterna-secondary); --el-dark: var(--aeterna-dark); --el-glow: var(--aeterna-glow); --el-bg: var(--aeterna-bg); --el-border: var(--aeterna-border); --el-gradient: var(--aeterna-gradient); }

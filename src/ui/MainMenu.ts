@@ -9,19 +9,21 @@ const ELEMENTAL_NAMES: Record<ElementalType, string> = {
   earth: 'Kaijom',
   water: 'Nitsuji',
   fire: 'Krakatoa',
+  aeterna: 'Aeterna',
 };
 
 const ELEMENTAL_COLORS: Record<ElementalType, string> = {
   earth: '#4caf50',
   water: '#42a5f5',
   fire: '#ff9800',
+  aeterna: '#c9a84c',
 };
 
-export type MenuScreen = 'main' | 'host-lobby' | 'join' | 'join-lobby';
+export type MenuScreen = 'main' | 'mode-select' | 'host-lobby' | 'join' | 'join-lobby';
 
 export interface MainMenuCallbacks {
-  onLocalPlay: () => void;
-  onHostGame: () => void;
+  onLocalPlay: (playerCount: number) => void;
+  onHostGame: (playerCount: number) => void;
   onJoinGame: (code: string) => void;
   onPickElemental: (elemental: ElementalType) => void;
   onStartGame: () => void;
@@ -35,6 +37,7 @@ export class MainMenu {
   private lobby: LobbyState | null = null;
   private localPlayerId: string = '';
   private error: string = '';
+  private pendingAction: 'local' | 'host' | null = null;
 
   constructor(container: HTMLElement, callbacks: MainMenuCallbacks) {
     this.container = container;
@@ -78,6 +81,9 @@ export class MainMenu {
       case 'main':
         this.renderMainScreen();
         break;
+      case 'mode-select':
+        this.renderModeSelect();
+        break;
       case 'host-lobby':
         this.renderHostLobby();
         break;
@@ -105,13 +111,49 @@ export class MainMenu {
     `;
 
     this.container.querySelector('#menu-local')!.addEventListener('click', () => {
-      this.callbacks.onLocalPlay();
+      this.pendingAction = 'local';
+      this.screen = 'mode-select';
+      this.render();
     });
     this.container.querySelector('#menu-host')!.addEventListener('click', () => {
-      this.callbacks.onHostGame();
+      this.pendingAction = 'host';
+      this.screen = 'mode-select';
+      this.render();
     });
     this.container.querySelector('#menu-join')!.addEventListener('click', () => {
       this.screen = 'join';
+      this.render();
+    });
+  }
+
+  private renderModeSelect() {
+    const title = this.pendingAction === 'host' ? 'Host Game' : 'Local Play';
+    this.container.innerHTML = `
+      <div class="menu-bg">
+        <div class="menu-panel">
+          <h2 class="menu-subtitle">${title}</h2>
+          <div class="mode-select-label">Choose Game Mode</div>
+          <div class="menu-buttons">
+            <button class="menu-btn menu-btn-primary" id="mode-3p">3 Players</button>
+            <button class="menu-btn" id="mode-4p">4 Players</button>
+            <button class="menu-btn menu-btn-secondary" id="mode-back">Back</button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const startWithCount = (count: number) => {
+      if (this.pendingAction === 'local') {
+        this.callbacks.onLocalPlay(count);
+      } else {
+        this.callbacks.onHostGame(count);
+      }
+    };
+    this.container.querySelector('#mode-3p')!.addEventListener('click', () => startWithCount(3));
+    this.container.querySelector('#mode-4p')!.addEventListener('click', () => startWithCount(4));
+    this.container.querySelector('#mode-back')!.addEventListener('click', () => {
+      this.screen = 'main';
+      this.pendingAction = null;
       this.render();
     });
   }

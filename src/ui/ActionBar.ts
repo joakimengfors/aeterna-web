@@ -13,24 +13,28 @@ const ELEMENTAL_NAMES: Record<ElementalType, string> = {
   earth: 'Kaijom',
   water: 'Nitsuji',
   fire: 'Krakatoa',
+  aeterna: 'Aeterna',
 };
 
 const AVATAR_IMAGES: Record<ElementalType, string> = {
   earth: 'assets/characters/elementals_illustration (earth).png',
   water: 'assets/characters/elementals_illustration (water).png',
   fire: 'assets/characters/elementals_illustration (fire).png',
+  aeterna: 'assets/characters/elementals_illustration (aeterna).png',
 };
 
 const MEEPLE_IMAGES: Record<ElementalType, string> = {
   earth: 'assets/meeples/earth-elemental.png',
   water: 'assets/meeples/water-elemental.png',
   fire: 'assets/meeples/fire-elemental.png',
+  aeterna: 'assets/characters/elementals_illustration (aeterna).png',
 };
 
 const SOT_HTML: Record<ElementalType, string> = {
   earth: 'Move the <img class="token-inline" src="assets/meeples/stone-minion.png" alt="Stone Minion"> Stone Minion up to 1 hex. It can capture <img class="token-inline" src="assets/meeples/water-elemental.png" alt="Nitsuji"> Nitsuji.',
   water: 'Move <img class="token-inline" src="assets/meeples/water-elemental.png"> up to 1 hex <span class="or-text">or</span> teleport to any hex containing a <img class="token-inline" src="assets/tokens/lake-token.png"> or <img class="token-inline" src="assets/tokens/fog.png">.',
   fire: 'Place a <img class="token-inline" src="assets/tokens/fire-token.png"> under you <span class="or-text">or</span> place a <img class="token-inline" src="assets/tokens/fire-token.png"> on an empty hex next to an existing <img class="token-inline" src="assets/tokens/fire-token.png">.',
+  aeterna: 'Duplicate a token on the board — pick a token, then choose an empty hex within 2 range.',
 };
 
 // Rich HTML descriptions for action cards (with inline token/meeple images)
@@ -47,6 +51,10 @@ const ACTION_HTML: Record<string, string> = {
   'flame-dash': '<img class="meeple-inline" src="assets/meeples/fire-elemental.png"> 3 in a line.<br><br>Place <img class="token-inline" src="assets/tokens/fire-token.png"> under you.',
   'firestorm': 'Add <img class="token-inline" src="assets/tokens/fire-token.png"> to up to 3 <img class="token-inline" src="assets/tokens/fire-token.png"> groups. <img class="meeple-inline" src="assets/meeples/fire-elemental.png"> freely through <img class="token-inline" src="assets/tokens/fire-token.png">.',
   'firewall': 'Place 3 <img class="token-inline" src="assets/tokens/fire-token.png"> in a line from <img class="meeple-inline" src="assets/meeples/fire-elemental.png">.',
+  'tides-embrace': 'Place an ocean tile on an empty shore hex, or move an existing ocean tile.',
+  'ash-to-lush': 'Place a <img class="token-inline" src="assets/tokens/fire-token.png"> from Fire\'s supply on an empty hex. If supply empty, move an existing <img class="token-inline" src="assets/tokens/fire-token.png">.',
+  'bark-and-bough': 'Place a <img class="token-inline" src="assets/tokens/forest-token.png"> from Earth\'s supply on an empty hex. If supply empty, move an existing <img class="token-inline" src="assets/tokens/forest-token.png">.',
+  'aeternas-favor': 'Remove the action cooldown from one Elemental\'s ability.',
 };
 
 // Ability icon sprites: { image, backgroundPosition }

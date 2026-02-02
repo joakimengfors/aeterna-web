@@ -89,7 +89,7 @@ export class NetworkController {
       peer.send(msg);
     }
 
-    this.signaling.startGame();
+    this.signaling.startGame(stateData, assignments);
   }
 
   // --- Game messages ---
@@ -184,6 +184,15 @@ export class NetworkController {
 
       case 'signal':
         this.handlePeerSignal(msg.from, msg.data);
+        break;
+
+      case 'start-game':
+        if (!this.isHost && msg.state && msg.playerAssignments) {
+          const myElemental = msg.playerAssignments[this.localId];
+          if (myElemental) {
+            this.onGameStartCallback?.(msg.state, myElemental);
+          }
+        }
         break;
 
       case 'error':
