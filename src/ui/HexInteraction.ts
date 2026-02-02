@@ -99,8 +99,17 @@ export class HexInteraction {
         path = [fromHex, toHex];
       }
     }
+    // Firestorm: fire moves through connected fire tokens
+    else if (action === 'firestorm') {
+      const bfsPath = getShortestPath(fromHex, toHex, (h) => {
+        // Allow fire-token hexes and the destination (which may be 1 hex beyond fire)
+        if (h === toHex) return true;
+        return this.state.hasToken(h, 'fire');
+      });
+      path = [fromHex, ...bfsPath];
+    }
     // BFS-based movement: compute shortest path through walkable hexes
-    else if (action === 'uproot' || action === 'landslide' || action === 'firestorm') {
+    else if (action === 'uproot' || action === 'landslide') {
       const bfsPath = getShortestPath(fromHex, toHex, (h) => {
         const hex = this.state.getHex(h);
         if (type === 'minion') return true;
@@ -929,40 +938,12 @@ export class HexInteraction {
 
     if (fogHex !== hexId) {
       // Animate fog token before updating state
-      const fromPos = getPixelPos(fogHex);
-      const toPos = getPixelPos(hexId);
-      const fromLeft = `${(fromPos.x / 628) * 100}%`;
-      const fromTop = `${(fromPos.y / 700) * 100}%`;
-      const targetLeft = `${(toPos.x / 628) * 100}%`;
-      const targetTop = `${(toPos.y / 700) * 100}%`;
-
-      // Find the fog standee at the old position
-      const container = this.board.getStandeeContainer();
-      const fogEls = container.querySelectorAll('.token-standee-fog') as NodeListOf<HTMLElement>;
-      let fogEl: HTMLElement | null = null;
-      // Use data attribute for reliable matching
-      for (const el of fogEls) {
-        if (el.getAttribute('data-hex') === String(fogHex)) {
-          fogEl = el;
-          break;
-        }
-      }
-
-      if (fogEl) {
-        fogEl.style.transition = 'left 350ms ease-in-out, top 350ms ease-in-out';
-        fogEl.style.left = targetLeft;
-        fogEl.style.top = targetTop;
-
-        setTimeout(() => {
-          this.executor.moveFog(fogHex, hexId);
-          this.checkWin();
-          this.promptNextFogMove();
-        }, 360);
-      } else {
+      this.board.animateTokenMove('fog', fogHex, hexId).then(() => {
         this.executor.moveFog(fogHex, hexId);
         this.checkWin();
+        this.renderAll();
         this.promptNextFogMove();
-      }
+      });
     } else {
       this.executor.moveFog(fogHex, hexId);
       this.checkWin();

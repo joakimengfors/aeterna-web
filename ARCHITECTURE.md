@@ -75,8 +75,8 @@ Before any action begins, `GameState.clone()` saves a deep copy. On undo, `Objec
 - **SVG viewBox**: `0 0 628 700` — hex positions are hardcoded in HexGrid.ts
 - **Container**: `aspect-ratio: 628/700` with `rotateX(42deg) scale(1.7)` for 3/4 perspective
 - **Background**: `board_big.png` on `::before` pseudo-element with `inset: -40%` for ocean bleed
-- **Standees**: HTML divs in `.standee-overlay` inside `.map-container`, positioned as `% of viewBox`, counter-rotated with `rotateX(-42deg)` to stand upright
-- **Tokens**: SVG `<image>` elements in token layer, positioned using viewBox coordinates
+- **Standees**: Three.js WebGL overlay for 3D models (earth, water, fire elementals + stone minion), HTML div fallback for types without GLB
+- **Tokens**: SVG `<image>` elements for forest/fire/lake tokens. Fog and mountain rendered as 3D models via ThreeOverlay (multi-instance cloning). HTML standee fallback when 3D unavailable
 
 ## Game Rules Implemented
 
@@ -153,7 +153,7 @@ Before any action begins, `GameState.clone()` saves a deep copy. On undo, `Objec
 
 ### Polish / Nice to Have
 
-7. **Animations** — No token placement, movement, or destruction animations. Everything snaps instantly. Could add CSS transitions or requestAnimationFrame sequences.
+7. **Animations** — No token placement or destruction animations beyond spawn. Movement animations exist for elementals and minion. Could add more CSS transitions or requestAnimationFrame sequences.
 
 8. **Sound effects** — No audio at all. Hooks could be added at action execution points.
 
@@ -199,14 +199,27 @@ public/assets/
     elementals_illustration (water).png  ← Nitsuji portrait
     elementals_illustration (fire).png   ← Krakatoa portrait
   meeples/
-    earth-elemental.png                  ← Kaijom standee art
-    water-elemental.png                  ← Nitsuji standee art
-    fire-elemental.png                   ← Krakatoa standee art
-    stone-minion.png                     ← Stone Minion standee art
+    earth-elemental.png                  ← Kaijom standee art (2D fallback)
+    water-elemental.png                  ← Nitsuji standee art (2D fallback)
+    fire-elemental.png                   ← Krakatoa standee art (2D fallback)
+    stone-minion.png                     ← Stone Minion standee art (2D fallback)
   tokens/
-    mountain.png                         ← Mountain silhouette token
+    mountain.png                         ← Mountain silhouette token (2D fallback)
     forest-token.png                     ← Forest token (circular)
     fire-token.png                       ← Fire token (circular)
     lake-token.png                       ← Lake token (circular)
-    fog.png                              ← Fog token (small, stackable)
+    fog.png                              ← Fog token (2D fallback)
+
+meeples/                                 ← 3D model files (GLB + textures)
+  elemental_earth.glb                    ← Kaijom 3D model
+  elemental_fire.glb                     ← Krakatoa 3D model
+  elemental_water.glb                    ← Nitsuji 3D model
+  meeple_stoneminion.glb                 ← Stone Minion 3D model
+  meeple_fog.glb                         ← Fog token 3D model
+  mountain.glb                           ← Mountain token 3D model (embedded materials)
+  earth.png                              ← Earth model texture
+  fire_meeple.png                        ← Fire model texture
+  water_meeple.png                       ← Water model texture
+  stone.png                              ← Stone Minion model texture
+  fog.png                                ← Fog model texture
 ```

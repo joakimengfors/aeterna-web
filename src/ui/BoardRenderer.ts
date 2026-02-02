@@ -131,6 +131,8 @@ export class BoardRenderer {
     this.standeeContainer.querySelectorAll('.token-standee').forEach(el => el.remove());
 
     const newTokens = new Map<HexId, string[]>();
+    const fogHexIds: HexId[] = [];
+    const mountainHexIds: HexId[] = [];
 
     for (const id of ALL_HEX_IDS) {
       const hex = state.getHex(id);
@@ -146,9 +148,16 @@ export class BoardRenderer {
           this.spawnedTokens.set(spawnKey, Date.now());
         }
 
-        // Fog and mountain render as standing pieces in HTML overlay
+        // Fog and mountain: use 3D models if available, else HTML standee
         if (token === 'fog' || token === 'mountain') {
-          this.renderTokenStandee(token, pos, id, hex.tokens, isNew);
+          if (this.threeOverlay?.hasTokenModel(token)) {
+            if (token === 'fog') fogHexIds.push(id);
+            else mountainHexIds.push(id);
+            // Still render the SVG shadow
+            this.renderTokenShadow(token, pos);
+          } else {
+            this.renderTokenStandee(token, pos, id, hex.tokens, isNew);
+          }
           continue;
         }
 
@@ -183,6 +192,28 @@ export class BoardRenderer {
     }
 
     this.previousTokens = newTokens;
+
+    // Sync 3D token model instances
+    if (this.threeOverlay?.hasTokenModel('fog')) {
+      this.threeOverlay.setTokenPositions('fog', fogHexIds);
+    }
+    if (this.threeOverlay?.hasTokenModel('mountain')) {
+      this.threeOverlay.setTokenPositions('mountain', mountainHexIds);
+    }
+  }
+
+  private renderTokenShadow(token: TokenType, pos: { x: number; y: number }) {
+    const isFog = token === 'fog';
+    const shadowRx = isFog ? 10 : 16;
+    const shadowRy = isFog ? 5 : 7;
+    const shadow = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
+    shadow.setAttribute('cx', String(pos.x));
+    shadow.setAttribute('cy', String(pos.y + 6));
+    shadow.setAttribute('rx', String(shadowRx));
+    shadow.setAttribute('ry', String(shadowRy));
+    shadow.setAttribute('fill', 'rgba(0,0,0,0.35)');
+    shadow.style.pointerEvents = 'none';
+    this.tokenLayer.appendChild(shadow);
   }
 
   private renderTokenStandee(token: TokenType, pos: { x: number; y: number }, hexId: HexId, allTokens: TokenType[], isNew: boolean) {
@@ -289,18 +320,22 @@ export class BoardRenderer {
       shadow.style.pointerEvents = 'none';
       this.standeeLayer.appendChild(shadow);
 
-      const el = document.createElement('div');
-      el.className = 'standee-3d standee-minion';
-      el.style.left = `${(pos.x / 628) * 100}%`;
-      el.style.top = `${(pos.y / 700) * 100}%`;
-      el.innerHTML = `
-        <div class="standee-figure standee-figure-sm">
-          <img src="assets/meeples/stone-minion.png" alt="Stone Minion">
-          <div class="standee-border" style="--standee-color: #78909c; --standee-glow: rgba(120,144,156,0.4);"></div>
-        </div>
-        <div class="standee-name-tag" style="--standee-color: #78909c;">MINION</div>
-      `;
-      this.standeeContainer.appendChild(el);
+      if (this.threeOverlay?.hasModel('stone_minion')) {
+        this.threeOverlay.setPosition('stone_minion', minionHex);
+      } else {
+        const el = document.createElement('div');
+        el.className = 'standee-3d standee-minion';
+        el.style.left = `${(pos.x / 628) * 100}%`;
+        el.style.top = `${(pos.y / 700) * 100}%`;
+        el.innerHTML = `
+          <div class="standee-figure standee-figure-sm">
+            <img src="assets/meeples/stone-minion.png" alt="Stone Minion">
+            <div class="standee-border" style="--standee-color: #78909c; --standee-glow: rgba(120,144,156,0.4);"></div>
+          </div>
+          <div class="standee-name-tag" style="--standee-color: #78909c;">MINION</div>
+        `;
+        this.standeeContainer.appendChild(el);
+      }
     }
   }
 
@@ -366,6 +401,9 @@ export class BoardRenderer {
     if (path.length === 0) return Promise.resolve();
 
     // Use Three.js animation for 3D models
+    if (type === 'minion' && this.threeOverlay?.hasModel('stone_minion')) {
+      return this.threeOverlay.animateAlongPath('stone_minion', path);
+    }
     if (type !== 'minion' && this.threeOverlay?.hasModel(type)) {
       return this.threeOverlay.animateAlongPath(type, path);
     }
@@ -408,6 +446,17 @@ export class BoardRenderer {
 
       advance();
     });
+  }
+
+  /**
+   * Animate a token (fog) from one hex to another via 3D overlay.
+   * Returns a promise that resolves when done. Falls back to instant if no 3D model.
+   */
+  animateTokenMove(type: string, fromHex: HexId, toHex: HexId): Promise<void> {
+    if (this.threeOverlay?.hasTokenModel(type)) {
+      return this.threeOverlay.animateTokenMove(type, fromHex, toHex);
+    }
+    return Promise.resolve();
   }
 
   highlightDanger(hexIds: HexId[]) {

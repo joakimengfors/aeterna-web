@@ -29,6 +29,7 @@ Capture an opposing elemental by moving onto their hex (element-specific capture
 
 - **TypeScript** — No framework, vanilla DOM manipulation
 - **Vite** — Dev server and build tool
+- **Three.js** — 3D meeple and token models (GLB) rendered via WebGL overlay
 - **SVG** — Hex grid rendering with CSS 3D perspective transforms
 - **CSS** — Animations, theming per element, responsive layout
 
