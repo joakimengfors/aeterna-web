@@ -276,10 +276,54 @@
             z-index: 2;
         }
 
-        /* Active turn border */
+        /* Active turn border — pulsing glow */
         .player-card.active-turn {
             border: 2px solid var(--el-primary);
-            box-shadow: 0 0 16px var(--el-glow), inset 0 0 8px var(--el-glow);
+            box-shadow: 0 0 16px var(--el-glow), 0 0 32px var(--el-glow), inset 0 0 8px var(--el-glow);
+            animation: active-pulse 2s ease-in-out infinite;
+        }
+        @keyframes active-pulse {
+            0%, 100% { box-shadow: 0 0 12px var(--el-glow), 0 0 24px var(--el-glow), inset 0 0 6px var(--el-glow); }
+            50% { box-shadow: 0 0 20px var(--el-glow), 0 0 48px var(--el-glow), inset 0 0 12px var(--el-glow); border-color: var(--el-primary); }
+        }
+
+        /* Earth — flickering nature glow */
+        .player-card.active-turn.theme-earth,
+        .bottom-panel.theme-earth {
+            animation: earth-burn 3s ease-in-out infinite alternate;
+        }
+        @keyframes earth-burn {
+            0% { box-shadow: 0 0 10px var(--el-glow), 0 -4px 20px rgba(76,175,80,0.4), 0 -2px 40px rgba(56,142,60,0.2), inset 0 0 8px rgba(76,175,80,0.15); }
+            25% { box-shadow: 0 0 14px var(--el-glow), 0 -6px 28px rgba(76,175,80,0.5), 0 -4px 48px rgba(56,142,60,0.3), inset 0 0 10px rgba(76,175,80,0.2); }
+            50% { box-shadow: 0 0 18px var(--el-glow), 0 -8px 32px rgba(76,175,80,0.6), 0 -6px 56px rgba(56,142,60,0.35), inset 0 0 14px rgba(76,175,80,0.25); }
+            75% { box-shadow: 0 0 12px var(--el-glow), 0 -5px 24px rgba(76,175,80,0.45), 0 -3px 44px rgba(56,142,60,0.25), inset 0 0 9px rgba(76,175,80,0.18); }
+            100% { box-shadow: 0 0 16px var(--el-glow), 0 -7px 30px rgba(76,175,80,0.55), 0 -5px 52px rgba(56,142,60,0.3), inset 0 0 12px rgba(76,175,80,0.22); }
+        }
+
+        /* Water — flickering ocean glow */
+        .player-card.active-turn.theme-water,
+        .bottom-panel.theme-water {
+            animation: water-burn 3s ease-in-out infinite alternate;
+        }
+        @keyframes water-burn {
+            0% { box-shadow: 0 0 10px var(--el-glow), 0 -4px 20px rgba(66,165,245,0.4), 0 -2px 40px rgba(30,136,229,0.2), inset 0 0 8px rgba(66,165,245,0.15); }
+            25% { box-shadow: 0 0 14px var(--el-glow), 0 -6px 28px rgba(66,165,245,0.5), 0 -4px 48px rgba(30,136,229,0.3), inset 0 0 10px rgba(66,165,245,0.2); }
+            50% { box-shadow: 0 0 18px var(--el-glow), 0 -8px 32px rgba(66,165,245,0.6), 0 -6px 56px rgba(30,136,229,0.35), inset 0 0 14px rgba(66,165,245,0.25); }
+            75% { box-shadow: 0 0 12px var(--el-glow), 0 -5px 24px rgba(66,165,245,0.45), 0 -3px 44px rgba(30,136,229,0.25), inset 0 0 9px rgba(66,165,245,0.18); }
+            100% { box-shadow: 0 0 16px var(--el-glow), 0 -7px 30px rgba(66,165,245,0.55), 0 -5px 52px rgba(30,136,229,0.3), inset 0 0 12px rgba(66,165,245,0.22); }
+        }
+
+        /* Fire — flickering burn */
+        .player-card.active-turn.theme-fire,
+        .bottom-panel.theme-fire {
+            animation: fire-burn 3s ease-in-out infinite alternate;
+        }
+        @keyframes fire-burn {
+            0% { box-shadow: 0 0 10px var(--el-glow), 0 -4px 20px rgba(255,152,0,0.4), 0 -2px 40px rgba(255,87,34,0.2), inset 0 0 8px rgba(255,152,0,0.15); }
+            25% { box-shadow: 0 0 14px var(--el-glow), 0 -6px 28px rgba(255,152,0,0.5), 0 -4px 48px rgba(255,87,34,0.3), inset 0 0 10px rgba(255,152,0,0.2); }
+            50% { box-shadow: 0 0 18px var(--el-glow), 0 -8px 32px rgba(255,152,0,0.6), 0 -6px 56px rgba(255,87,34,0.35), inset 0 0 14px rgba(255,152,0,0.25); }
+            75% { box-shadow: 0 0 12px var(--el-glow), 0 -5px 24px rgba(255,152,0,0.45), 0 -3px 44px rgba(255,87,34,0.25), inset 0 0 9px rgba(255,152,0,0.18); }
+            100% { box-shadow: 0 0 16px var(--el-glow), 0 -7px 30px rgba(255,152,0,0.55), 0 -5px 52px rgba(255,87,34,0.3), inset 0 0 12px rgba(255,152,0,0.22); }
         }
 
         /* bottom panel removed */
@@ -410,13 +454,16 @@
             position: relative;
             min-width: 408px; max-width: 576px;
             border-radius: var(--radius-lg);
-            border: 1px solid var(--el-border);
+            border: 2px solid var(--el-primary);
             background: var(--surface);
             box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6), 0 0 20px var(--el-glow);
             transform: scale(0.95);
             transition: transform 0.25s ease;
             overflow: hidden;
         }
+        .dialog-overlay.theme-earth .dialog-content { animation: earth-burn 3s ease-in-out infinite alternate; }
+        .dialog-overlay.theme-water .dialog-content { animation: water-burn 3s ease-in-out infinite alternate; }
+        .dialog-overlay.theme-fire .dialog-content { animation: fire-burn 3s ease-in-out infinite alternate; }
         .dialog-visible .dialog-content {
             transform: scale(1);
         }
@@ -722,7 +769,8 @@
         .bottom-panel {
             display: flex; align-items: stretch; gap: 0;
             background: var(--bg-dark);
-            border-top: 1px solid var(--surface-border);
+            border: 2px solid var(--el-primary);
+            border-radius: var(--radius-lg);
             position: relative;
         }
         .bottom-panel::before {
@@ -1015,54 +1063,6 @@
         }
         .btn-undo:hover { border-color: var(--surface-border-light); color: var(--text-secondary); }
 
-        /* Character switcher */
-        .char-switcher {
-            position: fixed;
-            top: 65px;
-            right: 50%;
-            transform: translateX(50%);
-            z-index: 100;
-            display: flex;
-            gap: 4px;
-            padding: 4px;
-            border-radius: var(--radius-lg);
-            background: rgba(10, 11, 15, 0.9);
-            border: 1px solid var(--surface-border-light);
-            backdrop-filter: blur(12px);
-            box-shadow: var(--shadow-lg);
-        }
-        .char-switcher-btn {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            padding: 4px 12px;
-            border-radius: var(--radius-md);
-            border: 1px solid transparent;
-            background: transparent;
-            cursor: pointer;
-            transition: all 0.15s ease;
-            font-family: var(--font-display);
-            font-size: var(--font-size-xs);
-            font-weight: 600;
-            color: var(--text-muted);
-        }
-        .char-switcher-btn img {
-            width: 24px; height: 24px;
-            border-radius: 50%;
-            object-fit: cover;
-            border: 2px solid transparent;
-        }
-        .char-switcher-btn.active,
-        .char-switcher-btn:hover { background: var(--surface); }
-        .char-switcher-btn[data-el="earth"].active,
-        .char-switcher-btn[data-el="earth"]:hover { color: var(--earth-primary); border-color: var(--earth-border); }
-        .char-switcher-btn[data-el="earth"].active img { border-color: var(--earth-primary); }
-        .char-switcher-btn[data-el="water"].active,
-        .char-switcher-btn[data-el="water"]:hover { color: var(--water-primary); border-color: var(--water-border); }
-        .char-switcher-btn[data-el="water"].active img { border-color: var(--water-primary); }
-        .char-switcher-btn[data-el="fire"].active,
-        .char-switcher-btn[data-el="fire"]:hover { color: var(--fire-primary); border-color: var(--fire-border); }
-        .char-switcher-btn[data-el="fire"].active img { border-color: var(--fire-primary); }
 
         /* Top bar instruction mode */
         .top-instruction {
@@ -1204,18 +1204,6 @@
     </style>
 </head>
 <body>
-    <!-- Character switcher (hotseat) -->
-    <div class="char-switcher" id="char-switcher">
-      <button class="char-switcher-btn active" data-el="earth">
-        <img src="assets/characters/elementals_illustration (earth).png" alt="Earth"> Kaijom
-      </button>
-      <button class="char-switcher-btn" data-el="water">
-        <img src="assets/characters/elementals_illustration (water).png" alt="Water"> Nitsuji
-      </button>
-      <button class="char-switcher-btn" data-el="fire">
-        <img src="assets/characters/elementals_illustration (fire).png" alt="Fire"> Krakatoa
-      </button>
-    </div>
 
     <div class="game-layout theme-earth">
         <div id="top-bar"></div>

@@ -187,11 +187,7 @@ export class HexInteraction {
     this.board.clearHighlights();
     this.playerPanel.render(this.state);
     this.topBar.render(this.state);
-
-    // Update character switcher
-    document.querySelectorAll('.char-switcher-btn').forEach(btn => {
-      btn.classList.toggle('active', btn.getAttribute('data-el') === this.state.currentPlayer);
-    });
+    this.dialog.setTheme(this.state.currentPlayer);
 
     // Auto-start SOT ability when entering START_OF_TURN
     if (this.state.phase === 'START_OF_TURN') {

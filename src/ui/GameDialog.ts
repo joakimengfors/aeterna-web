@@ -332,6 +332,11 @@ export class GameDialog {
     return 'Victory';
   }
 
+  setTheme(elementalType: ElementalType) {
+    this.overlay.classList.remove('theme-earth', 'theme-water', 'theme-fire');
+    this.overlay.classList.add(`theme-${elementalType}`);
+  }
+
   private show() {
     this.overlay.style.display = '';
     // Force reflow for animation
