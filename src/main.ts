@@ -84,9 +84,10 @@ function init() {
       for (const p of lobby.players) {
         if (p.elemental) assignments[p.id] = p.elemental;
       }
-      if (Object.keys(assignments).length !== 3) return;
+      const expectedPlayers = lobby.players.length;
+      if (Object.keys(assignments).length !== expectedPlayers) return;
 
-      const state = new GameState();
+      const state = new GameState(expectedPlayers);
       state.localPlayer = assignments[lobby.hostId];
       network.startGame(state, assignments);
 

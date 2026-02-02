@@ -59,7 +59,9 @@ export class PlayerPanel {
     const playerCards = state.turnOrder.map(type => {
       const player = state.getPlayer(type);
       const isActive = type === currentPlayer;
-      const isHunting = HUNT_CHAIN[type] !== null && HUNT_CHAIN[type] === currentPlayer;
+      // In multiplayer, "Hunts You" is relative to localPlayer; in hotseat, relative to currentPlayer
+      const myType = state.localPlayer ?? currentPlayer;
+      const isHunting = HUNT_CHAIN[type] !== null && HUNT_CHAIN[type] === myType;
 
       return `
         <div class="player-card theme-${type}${isActive ? ' active-turn' : ''}">
@@ -69,19 +71,13 @@ export class PlayerPanel {
             </div>
             <div class="player-info">
               <div class="player-elemental-name">${ELEMENTAL_NAMES[type]}</div>
-              <div class="player-username">${ELEMENTAL_LABELS[type]}</div>
+              <div class="player-username">${ELEMENTAL_LABELS[type]}${isHunting ? ' <span class="player-hunt-badge"><span class="material-icons">gps_fixed</span> Hunts You</span>' : ''}</div>
             </div>
-            ${isHunting ? `
-              <div class="player-hunt-badge">
-                <span class="material-icons">gps_fixed</span>
-                <span>Hunts You</span>
-              </div>
-            ` : ''}
           </div>
           <div class="player-card-body">
             <div class="win-condition">
               <span class="material-icons">emoji_events</span>
-              <span class="win-condition-text">${WIN_CONDITIONS[type]}</span>
+              <span class="win-condition-text">${type === 'aeterna' ? this.getAeternaWinText(state) : WIN_CONDITIONS[type]}</span>
             </div>
             <div class="token-supply">
               ${this.renderSupply(player.supplies, type)}
@@ -117,7 +113,10 @@ export class PlayerPanel {
       </div>
     `;
 
-    this.container.innerHTML = playerCards + specialCardHtml;
+    const is4p = state.playerCount === 4;
+    this.container.innerHTML = (is4p
+      ? `<div class="player-cards-grid">${playerCards}</div>`
+      : playerCards) + specialCardHtml;
 
     // Show full-page character card overlay
     this.container.querySelectorAll('.action-info-btn').forEach(btn => {
@@ -197,5 +196,11 @@ export class PlayerPanel {
       case 'ocean': return 2;
       default: return 0;
     }
+  }
+
+  private getAeternaWinText(state: GameState): string {
+    const used = state.specialDeck.discard.length;
+    const total = used + state.specialDeck.deck.length;
+    return `Balance all powers or exhaust the deck (${used}/${total})`;
   }
 }

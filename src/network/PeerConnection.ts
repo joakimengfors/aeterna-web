@@ -7,6 +7,21 @@ import { SignalingClient } from './SignalingClient';
 const ICE_SERVERS: RTCIceServer[] = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
+  {
+    urls: 'turn:openrelay.metered.ca:80',
+    username: 'openrelayproject',
+    credential: 'openrelayproject',
+  },
+  {
+    urls: 'turn:openrelay.metered.ca:443',
+    username: 'openrelayproject',
+    credential: 'openrelayproject',
+  },
+  {
+    urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+    username: 'openrelayproject',
+    credential: 'openrelayproject',
+  },
 ];
 
 export class PeerConnection {
@@ -17,6 +32,7 @@ export class PeerConnection {
   private onDisconnectedCallback: (() => void) | null = null;
   private _connected = false;
   private sendQueue: string[] = [];
+  private keepaliveTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
     private signaling: SignalingClient,
@@ -112,10 +128,27 @@ export class PeerConnection {
   }
 
   close() {
+    this.stopKeepalive();
     this.channel?.close();
     this.pc.close();
     this._connected = false;
     this.messageHandlers = [];
+  }
+
+  private startKeepalive() {
+    this.stopKeepalive();
+    this.keepaliveTimer = setInterval(() => {
+      if (this.channel && this.channel.readyState === 'open') {
+        this.channel.send(JSON.stringify({ type: '__ping' }));
+      }
+    }, 5000);
+  }
+
+  private stopKeepalive() {
+    if (this.keepaliveTimer) {
+      clearInterval(this.keepaliveTimer);
+      this.keepaliveTimer = null;
+    }
   }
 
   private setupChannel(channel: RTCDataChannel) {
@@ -123,15 +156,18 @@ export class PeerConnection {
     channel.onopen = () => {
       this._connected = true;
       this.flushQueue();
+      this.startKeepalive();
       this.onConnectedCallback?.();
     };
     channel.onclose = () => {
       this._connected = false;
+      this.stopKeepalive();
       this.onDisconnectedCallback?.();
     };
     channel.onmessage = (e) => {
       try {
         const data = JSON.parse(e.data);
+        if (data.type === '__ping') return;
         for (const handler of this.messageHandlers) {
           handler(data);
         }

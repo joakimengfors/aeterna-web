@@ -154,6 +154,7 @@ export class HexInteraction {
     this.state.sotUsed = newState.sotUsed;
     this.state.pendingForcedMove = newState.pendingForcedMove;
     this.state.pendingFogMove = newState.pendingFogMove;
+    this.state.playerCount = newState.playerCount;
 
     // Reset local interaction state
     this.selectedAction = null;
@@ -284,13 +285,14 @@ export class HexInteraction {
   private renderAll() {
     const layout = document.querySelector('.game-layout');
     if (layout) {
-      layout.className = `game-layout theme-${this.state.currentPlayer}`;
+      layout.className = `game-layout theme-${this.state.currentPlayer}${this.state.playerCount === 4 ? ' four-player' : ''}`;
     }
 
     this.board.render(this.state);
     this.board.clearHighlights();
     this.playerPanel.render(this.state);
     this.topBar.render(this.state);
+    this.dialog.hide();
     this.dialog.setTheme(this.state.currentPlayer);
 
     // In multiplayer, show waiting message when it's not our turn

@@ -20,6 +20,18 @@
             overflow: hidden;
             background: var(--bg-darkest);
         }
+        .game-layout.four-player {
+            grid-template-columns: 768px 1fr;
+        }
+        .game-layout.four-player #left-panel {
+            display: flex;
+            flex-direction: column;
+        }
+        .player-cards-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--spacing-md);
+        }
 
         #top-bar { grid-column: 1 / -1; position: relative; z-index: 3; }
 
@@ -370,16 +382,18 @@
         .player-info { flex: 1; min-width: 0; }
         .player-elemental-name {
             font-family: var(--font-display);
-            font-size: var(--font-size-base);
+            font-size: 26px;
             color: var(--el-primary);
             font-weight: 700;
         }
         .player-username { font-size: var(--font-size-xs); color: var(--text-muted); }
         .player-hunt-badge {
-            display: flex; align-items: center; gap: 4px;
-            padding: 2px 8px; border-radius: 12px;
+            display: inline-flex; align-items: center; gap: 3px;
+            padding: 1px 6px; border-radius: 10px;
             background: rgba(239, 83, 80, 0.15);
             border: 1px solid rgba(239, 83, 80, 0.3);
+            margin-left: 6px;
+            vertical-align: middle;
         }
         .player-hunt-badge .material-icons { font-size: 14px; color: var(--error); }
         .player-hunt-badge span { font-size: var(--font-size-xs); color: var(--error); font-weight: 500; }

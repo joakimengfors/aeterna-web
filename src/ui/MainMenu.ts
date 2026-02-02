@@ -38,6 +38,7 @@ export class MainMenu {
   private localPlayerId: string = '';
   private error: string = '';
   private pendingAction: 'local' | 'host' | null = null;
+  private selectedPlayerCount = 3;
 
   constructor(container: HTMLElement, callbacks: MainMenuCallbacks) {
     this.container = container;
@@ -143,6 +144,7 @@ export class MainMenu {
     `;
 
     const startWithCount = (count: number) => {
+      this.selectedPlayerCount = count;
       if (this.pendingAction === 'local') {
         this.callbacks.onLocalPlay(count);
       } else {
@@ -165,8 +167,9 @@ export class MainMenu {
     const localPlayer = lobby?.players.find(p => p.id === this.localPlayerId);
     const pickedElementals = new Set(lobby?.players.filter(p => p.elemental).map(p => p.elemental!) || []);
 
+    const requiredPlayers = this.selectedPlayerCount;
     const allPicked = lobby ? lobby.players.every(p => p.elemental !== null) : false;
-    const canStart = playerCount === 3 && allPicked;
+    const canStart = playerCount === requiredPlayers && allPicked;
 
     this.container.innerHTML = `
       <div class="menu-bg">
@@ -179,7 +182,7 @@ export class MainMenu {
           </div>
 
           <div class="lobby-players">
-            <div class="lobby-players-label">Players (${playerCount}/3)</div>
+            <div class="lobby-players-label">Players (${playerCount}/${requiredPlayers})</div>
             ${lobby ? lobby.players.map((p, i) => `
               <div class="lobby-player-row">
                 <span class="lobby-player-name">${i === 0 ? 'Host' : 'Player ' + (i + 1)}</span>
@@ -302,7 +305,11 @@ export class MainMenu {
   }
 
   private renderElementalPicker(current: ElementalType | null, taken: Set<ElementalType>): string {
-    const elementals: ElementalType[] = ['earth', 'water', 'fire'];
+    // Show aeterna option if host selected 4-player, or if someone in lobby already picked aeterna
+    const show4p = this.selectedPlayerCount === 4 || taken.has('aeterna');
+    const elementals: ElementalType[] = show4p
+      ? ['earth', 'water', 'fire', 'aeterna']
+      : ['earth', 'water', 'fire'];
     return `
       <div class="elemental-picker">
         <div class="elemental-picker-label">Choose Your Elemental</div>
@@ -314,7 +321,7 @@ export class MainMenu {
               <button class="elemental-pick-btn${isSelected ? ' selected' : ''}${isTaken ? ' taken' : ''}"
                       data-elemental="${el}" ${isTaken ? 'disabled' : ''}
                       style="--pick-color: ${ELEMENTAL_COLORS[el]}">
-                <img src="assets/meeples/${el}-elemental.png" alt="${ELEMENTAL_NAMES[el]}" class="elemental-pick-img">
+                <img src="${el === 'aeterna' ? 'assets/characters/elementals_illustration (aeterna).png' : `assets/meeples/${el}-elemental.png`}" alt="${ELEMENTAL_NAMES[el]}" class="elemental-pick-img">
                 <span class="elemental-pick-name">${ELEMENTAL_NAMES[el]}</span>
                 ${isTaken ? '<span class="elemental-pick-taken">Taken</span>' : ''}
               </button>

@@ -2,7 +2,7 @@
 
 ## Overview
 
-3-player hotseat hex board game built with vanilla TypeScript + Vite. No game framework — SVG hex grid with CSS 3D transforms for a tilted board perspective, Three.js WebGL overlay for 3D meeple and token models.
+3- or 4-player hotseat/multiplayer hex board game built with vanilla TypeScript + Vite. No game framework — SVG hex grid with CSS 3D transforms for a tilted board perspective, Three.js WebGL overlay for 3D meeple and token models.
 
 ## Tech Stack
 
@@ -110,16 +110,33 @@ Before any action begins, `GameState.clone()` saves a deep copy. On undo, `Objec
 | Earth (Kaijom) | Water | Uproot, Raise Mountain, Landslide, Sprout | Move Stone Minion 1 hex |
 | Water (Nitsuji) | Fire | Mosey, Conjure Lakes, Ocean Surf, Re-Materialize | Move 1 OR teleport to Lake/Fog |
 | Fire (Krakatoa) | Earth | Smoke Dash, Flame Dash, Firestorm, Firewall | Place Fire under self OR adjacent to fire |
+| Aeterna (The Island) | None | Tide's Embrace, Ash to Lush, Bark and Bough, Aeterna's Favor | If powers balanced → win; else duplicate a token within 2 range |
 
 ### Win Conditions
 
 - **Earth**: Capture Water (stand on same hex) OR 3 Forests on board
 - **Water**: Capture Fire OR Fire is trapped (no legal moves)
 - **Fire**: Capture Earth OR trap Earth OR 12 Fire tokens on board
+- **Aeterna**: All 3 elemental powers equal (checked at Aeterna's SOT) OR special ability deck exhausted
+
+### Aeterna (4th Player)
+
+- **No standee** — Aeterna is an off-board player representing the island itself
+- **Turn order**: Earth → Water → Fire → Aeterna → repeat
+- **Tokens**: 2 Ocean tiles (block hexes, placed on empty shore hexes)
+- **Power tracking**: Each elemental's power = their tokens on board (earth: mountains+forests, water: lakes, fire: fire tokens), capped at 5
+- **Ocean tiles** block all movement for all elementals
+- **Deck change**: In 4-player mode, the special ability deck does NOT reshuffle when empty
+- **Actions**:
+  1. **Tide's Embrace** — Place or move an ocean tile on an empty shore hex
+  2. **Ash to Lush** — Place fire token (from Fire's supply) or relocate existing fire token
+  3. **Bark and Bough** — Place forest (from Earth's supply) or relocate existing forest
+  4. **Aeterna's Favor** — Remove action marker cooldown from any elemental (dialog-based)
 
 ### Movement Rules
 
 - **Earth (Uproot/Landslide)**: Can pass through mountains and stone minion hexes but cannot end on them. Fire tokens and fog block movement entirely.
+- **Ocean tiles**: Block all movement for all elementals (treated as impassable).
 - **Flame Dash**: Player may place fire on their current hex before moving OR on the destination hex after moving (not both).
 - **Fog Movement**: Whenever Water moves (not teleports), all fog tokens may be moved up to the same distance. Fog can move to any adjacent hex.
 - **Fog Auto-deploy**: When the last lake token is placed (via Conjure or fire→lake conversion), fog automatically deploys from supply onto the same hex.
@@ -159,38 +176,35 @@ Before any action begins, `GameState.clone()` saves a deep copy. On undo, `Objec
 - [x] Character switcher for hotseat play
 - [x] Undo/cancel during action execution
 - [x] Hex highlighting: valid targets (purple), selected, dimmed, danger preview
-- [x] Theme switching per player (earth green, water blue, fire orange)
+- [x] Theme switching per player (earth green, water blue, fire orange, aeterna gold)
 - [x] Scenario 1 starting setup
+- [x] Aeterna (4th player) with full game logic, actions, win conditions, power tracking
+- [x] 4-player mode with 2x2 player card grid layout
+- [x] Multiplayer via WebRTC with STUN/TURN servers and keepalive pings
+- [x] Elemental picker in multiplayer lobby (3 or 4 player)
+- [x] Deck exhaustion counter in Aeterna's win condition display
 
 ## Known Issues & TODOs
 
-### Must Fix
-
-1. **Raise Mountain "move existing mountain"** — When all 4 mountains are placed, the action should let you pick up an existing mountain and relocate it. The target selection flow for this needs refinement (currently implemented but the 2-target UX for source→destination isn't polished).
-
 ### Should Improve
 
-2. **Re-Materialize action** — Swap between Nitsuji and a Fog token. Works but could use better visual feedback showing the swap preview.
+1. **Re-Materialize action** — Swap between Nitsuji and a Fog token. Works but could use better visual feedback showing the swap preview.
 
-3. **Firestorm multi-step** — The 3-step fire group expansion + movement flow works but the UX could be clearer about which step you're on (currently relies on stepInstruction text).
+2. **Firestorm multi-step** — The 3-step fire group expansion + movement flow works but the UX could be clearer about which step you're on (currently relies on stepInstruction text).
 
-4. **Action card descriptions** — The `ACTION_HTML` map in ActionBar.ts has rich descriptions with inline images, but some descriptions could be more precise about ranges and conditions.
+3. **Action card descriptions** — The `ACTION_HTML` map in ActionBar.ts has rich descriptions with inline images, but some descriptions could be more precise about ranges and conditions.
 
 ### Polish / Nice to Have
 
-7. **Token animations** — No token placement or destruction animations beyond spawn. Could add CSS transitions or requestAnimationFrame sequences for token appear/disappear.
+4. **Token animations** — No token placement or destruction animations beyond spawn. Could add CSS transitions or requestAnimationFrame sequences for token appear/disappear.
 
-8. **Sound effects** — No audio at all. Hooks could be added at action execution points.
+5. **Sound effects** — No audio at all. Hooks could be added at action execution points.
 
-9. **Board hex numbers** — Still visible (useful for debugging). Could be toggled or hidden for clean gameplay.
+6. **Board hex numbers** — Still visible (useful for debugging). Could be toggled or hidden for clean gameplay.
 
-11. **Mobile/responsive** — Layout is desktop-only (3-column grid). Would need significant rework for mobile.
+7. **Mobile/responsive** — Layout is desktop-only (3-column grid). Would need significant rework for mobile.
 
-12. **Extract CSS** — Most styles are inline in `index.html`. Should be moved to `styles.css` or component-specific CSS files.
-
-13. **Aeterna (4th player)** — Not in MVP scope. Would require significant game logic additions.
-
-14. **Multiplayer/networking** — Main menu + WebRTC infrastructure in place. Host/guest roles, lobby with elemental picker, full state sync after each turn. Signaling server (Cloudflare Worker) needs deployment. Guest action forwarding to host not yet wired.
+8. **Extract CSS** — Most styles are inline in `index.html`. Should be moved to `styles.css` or component-specific CSS files.
 
 ## File Sizes
 
@@ -231,6 +245,7 @@ public/assets/
     elementals_illustration (earth).png  ← Kaijom portrait
     elementals_illustration (water).png  ← Nitsuji portrait
     elementals_illustration (fire).png   ← Krakatoa portrait
+    elementals_illustration (aeterna).png ← Aeterna portrait
   meeples/
     earth-elemental.png                  ← Kaijom standee art (2D fallback)
     water-elemental.png                  ← Nitsuji standee art (2D fallback)
