@@ -94,7 +94,6 @@ export class MainMenu {
     this.container.innerHTML = `
       <div class="menu-bg">
         <div class="menu-panel">
-          <img src="assets/aeterna_logo.png" alt="Aeterna" class="menu-logo">
           <div class="menu-buttons">
             <button class="menu-btn menu-btn-primary" id="menu-local">Local Play</button>
             <button class="menu-btn" id="menu-host">Host Game</button>
@@ -130,7 +129,6 @@ export class MainMenu {
     this.container.innerHTML = `
       <div class="menu-bg">
         <div class="menu-panel">
-          <img src="assets/aeterna_logo.png" alt="Aeterna" class="menu-logo">
           <h2 class="menu-subtitle">Host Game</h2>
 
           <div class="lobby-code-box">
@@ -175,7 +173,6 @@ export class MainMenu {
     this.container.innerHTML = `
       <div class="menu-bg">
         <div class="menu-panel">
-          <img src="assets/aeterna_logo.png" alt="Aeterna" class="menu-logo">
           <h2 class="menu-subtitle">Join Game</h2>
 
           <div class="join-input-group">
@@ -230,7 +227,6 @@ export class MainMenu {
     this.container.innerHTML = `
       <div class="menu-bg">
         <div class="menu-panel">
-          <img src="assets/aeterna_logo.png" alt="Aeterna" class="menu-logo">
           <h2 class="menu-subtitle">Lobby</h2>
 
           <div class="lobby-players">

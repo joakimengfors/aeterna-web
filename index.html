@@ -1217,14 +1217,15 @@
         .menu-bg {
             width: 100%;
             height: 100%;
-            background: url('/assets/aeterna_splash.png') center/cover no-repeat;
+            background: url('/assets/aeterna_splash.png') center/contain no-repeat, #1D252E;
             display: flex;
-            align-items: center;
+            align-items: flex-end;
             justify-content: center;
+            padding-bottom: 225px;
         }
         .menu-panel {
             background: rgba(8, 12, 24, 0.92);
-            border: 1px solid rgba(201, 168, 76, 0.3);
+            border: 2px solid rgba(76, 175, 80, 0.5);
             border-radius: 16px;
             padding: 40px 48px;
             display: flex;
@@ -1235,7 +1236,14 @@
             max-width: 520px;
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
-            box-shadow: 0 8px 60px rgba(0,0,0,0.7), 0 0 40px rgba(201, 168, 76, 0.1);
+            animation: earth-menu-glow 3s ease-in-out infinite alternate;
+        }
+        @keyframes earth-menu-glow {
+            0% { box-shadow: 0 0 10px rgba(76,175,80,0.3), 0 -4px 20px rgba(76,175,80,0.4), 0 -2px 40px rgba(56,142,60,0.2), inset 0 0 8px rgba(76,175,80,0.15); }
+            25% { box-shadow: 0 0 14px rgba(76,175,80,0.3), 0 -6px 28px rgba(76,175,80,0.5), 0 -4px 48px rgba(56,142,60,0.3), inset 0 0 10px rgba(76,175,80,0.2); }
+            50% { box-shadow: 0 0 18px rgba(76,175,80,0.3), 0 -8px 32px rgba(76,175,80,0.6), 0 -6px 56px rgba(56,142,60,0.35), inset 0 0 14px rgba(76,175,80,0.25); }
+            75% { box-shadow: 0 0 12px rgba(76,175,80,0.3), 0 -5px 24px rgba(76,175,80,0.45), 0 -3px 44px rgba(56,142,60,0.25), inset 0 0 9px rgba(76,175,80,0.18); }
+            100% { box-shadow: 0 0 16px rgba(76,175,80,0.3), 0 -7px 30px rgba(76,175,80,0.55), 0 -5px 52px rgba(56,142,60,0.3), inset 0 0 12px rgba(76,175,80,0.22); }
         }
         .menu-logo {
             width: 280px;
