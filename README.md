@@ -59,9 +59,11 @@ index.html                      # Single-page shell
 
 ## Getting Started
 
+This project uses [Bun](https://bun.sh) as its package manager and runtime.
+
 ```bash
-npm install
-npm run dev
+bun install
+bun run dev
 ```
 
 Open `http://localhost:5173` in your browser.
@@ -69,6 +71,6 @@ Open `http://localhost:5173` in your browser.
 ## Build
 
 ```bash
-npm run build
-npm run preview
+bun run build
+bun run preview
 ```
