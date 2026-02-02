@@ -19,12 +19,14 @@ interface ModelDef {
   preRotateX?: number;  // X-axis pre-rotation to fix authoring orientation
   preRotateY?: number;  // Y-axis pre-rotation to fix authoring orientation
   facingOffset?: number; // Z-rotation offset for movement facing direction (default 0)
+  offsetX?: number;     // X offset after centering (fix off-center models)
+  offsetY?: number;     // Y offset after centering (fix off-center models)
 }
 
 const MODEL_CONFIG: Record<string, ModelDef> = {
   earth:        { glb: 'meeples/elemental_earth.glb',    texture: 'meeples/earth.png' },
   fire:         { glb: 'meeples/elemental_fire.glb',     texture: 'meeples/fire_meeple.png' },
-  water:        { glb: 'meeples/elemental_water.glb',    texture: 'meeples/water_meeple.png', preRotateX: Math.PI / 2 },
+  water:        { glb: 'meeples/elemental_water.glb',    texture: 'meeples/water_meeple.png', preRotateX: Math.PI / 2, offsetY: 10 },
   stone_minion: { glb: 'meeples/meeple_stoneminion.glb', texture: 'meeples/stone.png', height: 60, preRotateX: Math.PI / 2 },
 };
 
@@ -135,7 +137,7 @@ export class ThreeOverlay {
     });
   }
 
-  private scaleAndPivotModel(model: THREE.Group, targetHeight: number, tilt = -1.15, preRotateX = 0, preRotateY = 0): THREE.Group {
+  private scaleAndPivotModel(model: THREE.Group, targetHeight: number, tilt = -1.15, preRotateX = 0, preRotateY = 0, offsetX = 0, offsetY = 0): THREE.Group {
     // Apply pre-rotation to fix authoring orientation before anything else
     if (preRotateX !== 0) model.rotation.x = preRotateX;
     if (preRotateY !== 0) model.rotation.y = preRotateY;
@@ -154,7 +156,7 @@ export class ThreeOverlay {
     const boxScaled = new THREE.Box3().setFromObject(model);
     const scaledCenter = new THREE.Vector3();
     boxScaled.getCenter(scaledCenter);
-    model.position.set(-scaledCenter.x, -scaledCenter.y, -scaledCenter.z);
+    model.position.set(-scaledCenter.x + offsetX, -scaledCenter.y + offsetY, -scaledCenter.z);
 
     innerGroup.add(model);
     innerGroup.rotation.x = tilt;
@@ -170,9 +172,11 @@ export class ThreeOverlay {
     const tilt = def.tilt ?? -1.15;
     const preRotateX = def.preRotateX ?? 0;
     const preRotateY = def.preRotateY ?? 0;
+    const offsetX = def.offsetX ?? 0;
+    const offsetY = def.offsetY ?? 0;
 
     const onModelLoaded = (model: THREE.Group) => {
-      const pivot = this.scaleAndPivotModel(model, height, tilt, preRotateX, preRotateY);
+      const pivot = this.scaleAndPivotModel(model, height, tilt, preRotateX, preRotateY, offsetX, offsetY);
       this.scene.add(pivot);
       entry.pivot = pivot;
       if (entry.pendingHexId !== null) {
@@ -293,12 +297,18 @@ export class ThreeOverlay {
 
   /** Animate a Z-rotation on a pivot (spin on the board plane) */
   private animateRotation(pivot: THREE.Group, from: number, to: number, ms: number): Promise<void> {
+    // Normalize to shortest rotation path
+    let delta = to - from;
+    delta = ((delta + Math.PI) % (2 * Math.PI)) - Math.PI;
+    if (delta < -Math.PI) delta += 2 * Math.PI;
+    const normalizedTo = from + delta;
+
     return new Promise(resolve => {
       const startTime = performance.now();
       const tick = () => {
         const t = Math.min((performance.now() - startTime) / ms, 1);
         const ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-        pivot.rotation.z = from + (to - from) * ease;
+        pivot.rotation.z = from + (normalizedTo - from) * ease;
         if (t < 1) requestAnimationFrame(tick);
         else resolve();
       };
@@ -331,6 +341,7 @@ export class ThreeOverlay {
         if (step >= positions.length) {
           // Turn back to face camera
           await this.animateRotation(pivot, pivot.rotation.z, 0, TURN_MS);
+          pivot.rotation.z = 0; // Reset to exact 0 to prevent drift
           resolve();
           return;
         }

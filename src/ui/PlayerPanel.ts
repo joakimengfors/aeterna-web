@@ -83,7 +83,7 @@ export class PlayerPanel {
             <div class="action-markers">
               <button class="action-info-btn" data-player="${type}">
                 <span class="material-icons">info_outline</span>
-                Actions${player.actionMarker ? ' <span class="cooldown-badge">1 on cooldown</span>' : ''}
+                Actions${player.actionMarker ? ` <span class="cooldown-badge">⏳ ${getActionsForElemental(type).find(a => a.id === player.actionMarker)?.name ?? player.actionMarker}</span>` : ''}
               </button>
             </div>
           </div>

@@ -16,6 +16,7 @@ export class PeerConnection {
   private onConnectedCallback: (() => void) | null = null;
   private onDisconnectedCallback: (() => void) | null = null;
   private _connected = false;
+  private sendQueue: string[] = [];
 
   constructor(
     private signaling: SignalingClient,
@@ -94,9 +95,20 @@ export class PeerConnection {
   }
 
   send(data: any) {
+    const msg = JSON.stringify(data);
     if (this.channel && this.channel.readyState === 'open') {
-      this.channel.send(JSON.stringify(data));
+      this.channel.send(msg);
+    } else {
+      this.sendQueue.push(msg);
     }
+  }
+
+  private flushQueue() {
+    if (!this.channel || this.channel.readyState !== 'open') return;
+    for (const msg of this.sendQueue) {
+      this.channel.send(msg);
+    }
+    this.sendQueue = [];
   }
 
   close() {
@@ -110,6 +122,7 @@ export class PeerConnection {
     this.channel = channel;
     channel.onopen = () => {
       this._connected = true;
+      this.flushQueue();
       this.onConnectedCallback?.();
     };
     channel.onclose = () => {
