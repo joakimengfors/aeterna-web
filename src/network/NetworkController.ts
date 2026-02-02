@@ -106,8 +106,18 @@ export class NetworkController {
     }
   }
 
+  /** Host broadcasts state to all guests */
   broadcastState(state: GameState) {
     if (!this.isHost) return;
+    const msg: NetworkMessage = { type: 'state-update', data: GameState.toJSON(state) };
+    for (const peer of this.peers.values()) {
+      peer.send(msg);
+    }
+  }
+
+  /** Guest sends state to host after completing their turn */
+  sendStateToHost(state: GameState) {
+    if (this.isHost) return;
     const msg: NetworkMessage = { type: 'state-update', data: GameState.toJSON(state) };
     for (const peer of this.peers.values()) {
       peer.send(msg);

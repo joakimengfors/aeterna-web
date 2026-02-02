@@ -104,24 +104,38 @@ export class HexInteraction {
   private setupNetworkHandlers() {
     if (!this.network) return;
 
-    if (this.network.isHost) {
-      // Host receives action intents from guests
-      this.network.onActionIntent((intent, fromId) => {
-        // Validate and apply — for now, trust the intent
-        // In a full implementation, you'd validate the intent against game rules
-        // and only then apply + broadcast
-      });
-    } else {
-      // Guest receives state updates from host
-      this.network.onRemoteState((data) => {
+    // Both host and guest receive state updates
+    this.network.onRemoteState((data) => {
+      if (this.network!.isHost) {
+        // Host received state from a guest who finished their turn — validate & rebroadcast
         this.applyRemoteState(data);
-      });
+        this.network!.broadcastState(this.state);
+      } else {
+        // Guest received authoritative state from host
+        this.applyRemoteState(data);
+      }
+    });
+
+    this.network.onPeerDisconnected((_peerId) => {
+      this.dialog.showInfo('Disconnected', 'A player has disconnected from the game.');
+    });
+  }
+
+  /** Send state to the network after a turn ends or game ends */
+  private syncState() {
+    if (!this.network) return;
+    if (this.network.isHost) {
+      this.network.broadcastState(this.state);
+    } else {
+      this.network.sendStateToHost(this.state);
     }
   }
 
-  applyRemoteState(stateData: any) {
+  private applyRemoteState(stateData: any) {
     const newState = GameState.fromJSON(stateData);
     newState.localPlayer = this.state.localPlayer;
+
+    const prevPlayer = this.state.currentPlayer;
 
     // Replace state fields
     this.state.board = newState.board;
@@ -140,8 +154,33 @@ export class HexInteraction {
     this.state.pendingForcedMove = newState.pendingForcedMove;
     this.state.pendingFogMove = newState.pendingFogMove;
 
+    // Reset local interaction state
+    this.selectedAction = null;
+    this.actionTargets = [];
+    this.currentStep = 0;
+    this.savedState = null;
+    this.validTargets = [];
+    this.pendingFogMoves = [];
+    this.postFogCallback = null;
+    this.postForcedMoveCallback = null;
+
     this.executor = new ActionExecutor(this.state);
-    this.renderAll();
+
+    // Check if game is over
+    if (this.state.winner) {
+      this.board.render(this.state);
+      this.dialog.showVictory(this.state, () => {
+        this.returnToMenu();
+      });
+      return;
+    }
+
+    // Show turn banner if the current player changed
+    if (this.state.currentPlayer !== prevPlayer) {
+      this.showTurnBanner(() => this.renderAll());
+    } else {
+      this.renderAll();
+    }
   }
 
   /** Queue a movement animation to play after the next board.render() call */
@@ -1158,6 +1197,7 @@ export class HexInteraction {
         this.startFogMovePhase(1, () => {
           this.turnMgr.endTurn();
           this.executor = new ActionExecutor(this.state);
+          this.syncState();
           this.showTurnBanner(() => this.renderAll());
         });
         return;
@@ -1165,6 +1205,7 @@ export class HexInteraction {
 
       this.turnMgr.endTurn();
       this.executor = new ActionExecutor(this.state);
+      this.syncState();
       this.showTurnBanner(() => this.renderAll());
       return;
     }
@@ -1188,12 +1229,7 @@ export class HexInteraction {
     this.waterHexBeforeMosey = null;
     this.turnMgr.endTurn();
     this.executor = new ActionExecutor(this.state);
-
-    // Broadcast state to guests after turn ends
-    if (this.network?.isHost) {
-      this.network.broadcastState(this.state);
-    }
-
+    this.syncState();
     this.showTurnBanner(() => this.renderAll());
   }
 
@@ -1296,12 +1332,18 @@ export class HexInteraction {
     const winner = checkWinConditions(this.state);
     if (winner) {
       this.state.winner = winner;
+      this.syncState();
       this.board.render(this.state);
       this.dialog.showVictory(this.state, () => {
-        window.location.reload();
+        this.returnToMenu();
       });
       return true;
     }
     return false;
+  }
+
+  private returnToMenu() {
+    this.network?.close();
+    window.location.reload();
   }
 }
