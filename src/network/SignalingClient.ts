@@ -8,6 +8,7 @@ import type { ElementalType } from '../game/types';
 export class SignalingClient {
   private ws: WebSocket | null = null;
   private messageHandlers: ((msg: SignalingMessage) => void)[] = [];
+  private keepaliveTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(private serverUrl: string) {}
 
@@ -20,9 +21,14 @@ export class SignalingClient {
         return;
       }
 
-      this.ws.onopen = () => resolve();
+      this.ws.onopen = () => {
+        this.startKeepalive();
+        resolve();
+      };
       this.ws.onerror = (e) => reject(e);
-      this.ws.onclose = () => {};
+      this.ws.onclose = () => {
+        this.stopKeepalive();
+      };
 
       this.ws.onmessage = (event) => {
         try {
@@ -71,12 +77,34 @@ export class SignalingClient {
     this.send({ type: 'start-game', state, playerAssignments });
   }
 
+  /** Relay game data to a specific player via signaling (WebRTC fallback) */
+  relay(toId: string, data: any) {
+    this.send({ type: 'relay', to: toId, data });
+  }
+
   close() {
+    this.stopKeepalive();
     if (this.ws) {
       this.ws.close();
       this.ws = null;
     }
     this.messageHandlers = [];
+  }
+
+  private startKeepalive() {
+    this.stopKeepalive();
+    this.keepaliveTimer = setInterval(() => {
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        this.ws.send(JSON.stringify({ type: 'ping' }));
+      }
+    }, 30000);
+  }
+
+  private stopKeepalive() {
+    if (this.keepaliveTimer) {
+      clearInterval(this.keepaliveTimer);
+      this.keepaliveTimer = null;
+    }
   }
 
   get connected(): boolean {

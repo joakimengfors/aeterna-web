@@ -167,6 +167,10 @@ export class GameRoom {
 
   private handleMessage(fromId: string, msg: any) {
     switch (msg.type) {
+      case 'ping':
+        // Keepalive — ignore
+        break;
+
       case 'signal': {
         const target = this.players.get(msg.to);
         if (target) {
@@ -214,6 +218,19 @@ export class GameRoom {
           playerAssignments: msg.playerAssignments,
         }, fromId);
         break;
+
+      case 'relay': {
+        // Forward game data to a specific player via signaling (WebRTC fallback)
+        const relayTarget = this.players.get(msg.to);
+        if (relayTarget) {
+          this.sendToWs(relayTarget.ws, {
+            type: 'relay',
+            from: fromId,
+            data: msg.data,
+          });
+        }
+        break;
+      }
     }
   }
 

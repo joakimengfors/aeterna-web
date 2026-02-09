@@ -54,5 +54,6 @@ export type SignalingMessage =
   | { type: 'pick-elemental'; elemental: ElementalType }
   | { type: 'elemental-picked'; playerId: string; elemental: ElementalType }
   | { type: 'start-game'; state?: any; playerAssignments?: Record<string, ElementalType> }
+  | { type: 'relay'; from: string; data: any }
   | { type: 'error'; message: string }
   | { type: 'room-joined'; hostId: string; playerId: string; players: { id: string; elemental: ElementalType | null }[] };

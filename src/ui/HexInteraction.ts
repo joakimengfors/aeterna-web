@@ -172,7 +172,7 @@ export class HexInteraction {
     if (this.state.winner) {
       this.board.render(this.state);
       this.dialog.showVictory(this.state, {
-        onRematch: () => this.returnToMenu(),
+        onRematch: () => this.rematch(),
         onReturnToMenu: () => this.returnToMenu(),
         onReturnToLobby: this.network ? () => this.returnToMenu() : undefined,
       });
@@ -349,6 +349,11 @@ export class HexInteraction {
   // ==========================================
 
   private onSOTStart() {
+    // Aeterna SOT: check balance win BEFORE duplication
+    if (this.state.currentPlayer === 'aeterna') {
+      if (this.checkAeternaBalanceWin()) return;
+    }
+
     this.savedState = this.state.clone();
     const targets = this.executor.getSOTValidTargets();
     if (targets.length === 0) {
@@ -1527,6 +1532,24 @@ export class HexInteraction {
   }
 
   /** Check win conditions. Returns true if game is over. */
+  private checkAeternaBalanceWin(): boolean {
+    const ep = this.state.getElementalPower('earth');
+    const wp = this.state.getElementalPower('water');
+    const fp = this.state.getElementalPower('fire');
+    if (ep === wp && wp === fp) {
+      this.state.winner = 'aeterna';
+      this.syncState();
+      this.board.render(this.state);
+      this.dialog.showVictory(this.state, {
+        onRematch: () => this.rematch(),
+        onReturnToMenu: () => this.returnToMenu(),
+        onReturnToLobby: this.network ? () => this.returnToMenu() : undefined,
+      });
+      return true;
+    }
+    return false;
+  }
+
   private checkWin(): boolean {
     const winner = checkWinConditions(this.state);
     if (winner) {
@@ -1534,13 +1557,29 @@ export class HexInteraction {
       this.syncState();
       this.board.render(this.state);
       this.dialog.showVictory(this.state, {
-        onRematch: () => this.returnToMenu(),
+        onRematch: () => this.rematch(),
         onReturnToMenu: () => this.returnToMenu(),
         onReturnToLobby: this.network ? () => this.returnToMenu() : undefined,
       });
       return true;
     }
     return false;
+  }
+
+  private rematch() {
+    const playerCount = this.state.playerCount;
+    const localPlayer = this.state.localPlayer;
+    this.state = new GameState(playerCount);
+    if (localPlayer) this.state.localPlayer = localPlayer;
+    this.executor = new ActionExecutor(this.state);
+    this.turnMgr = new TurnManager(this.state);
+    this.selectedAction = null;
+    this.actionTargets = [];
+    this.currentStep = 0;
+    this.savedState = null;
+    this.validTargets = [];
+    this.dialog.hide();
+    this.showTurnBanner(() => this.renderAll());
   }
 
   private returnToMenu() {

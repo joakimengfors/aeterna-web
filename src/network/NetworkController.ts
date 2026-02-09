@@ -17,6 +17,7 @@ export class NetworkController {
   private localId = '';
   private roomCode = '';
   private lobbyState: LobbyState | null = null;
+  private gameStarted = false;
 
   // Callbacks
   private onLobbyUpdateCallback: ((lobby: LobbyState) => void) | null = null;
@@ -77,6 +78,7 @@ export class NetworkController {
   startGame(state: GameState, assignments: Record<string, ElementalType>) {
     if (!this.isHost) return;
 
+    this.gameStarted = true;
     const stateData = GameState.toJSON(state);
     const msg: NetworkMessage = {
       type: 'game-start',
@@ -84,11 +86,10 @@ export class NetworkController {
       playerAssignments: assignments,
     };
 
-    // Send to all peers
-    for (const peer of this.peers.values()) {
-      peer.send(msg);
-    }
+    // Send to all peers (WebRTC if open, signaling relay if not)
+    this.sendToAllPeers(msg);
 
+    // Also send via signaling broadcast as fallback
     this.signaling.startGame(stateData, assignments);
   }
 
@@ -100,9 +101,7 @@ export class NetworkController {
       // Host processes locally — shouldn't call this normally
     } else {
       // Guest sends to host
-      for (const peer of this.peers.values()) {
-        peer.send(msg);
-      }
+      this.sendToAllPeers(msg);
     }
   }
 
@@ -110,17 +109,24 @@ export class NetworkController {
   broadcastState(state: GameState) {
     if (!this.isHost) return;
     const msg: NetworkMessage = { type: 'state-update', data: GameState.toJSON(state) };
-    for (const peer of this.peers.values()) {
-      peer.send(msg);
-    }
+    this.sendToAllPeers(msg);
   }
 
   /** Guest sends state to host after completing their turn */
   sendStateToHost(state: GameState) {
     if (this.isHost) return;
     const msg: NetworkMessage = { type: 'state-update', data: GameState.toJSON(state) };
-    for (const peer of this.peers.values()) {
-      peer.send(msg);
+    this.sendToAllPeers(msg);
+  }
+
+  /** Send a message to all peers, falling back to signaling relay if WebRTC isn't open */
+  private sendToAllPeers(msg: NetworkMessage) {
+    for (const [peerId, peer] of this.peers) {
+      if (peer.channelOpen) {
+        peer.send(msg);
+      } else {
+        this.signaling.relay(peerId, msg);
+      }
     }
   }
 
@@ -169,6 +175,12 @@ export class NetworkController {
           this.lobbyState.players = this.lobbyState.players.filter(p => p.id !== msg.playerId);
           this.onLobbyUpdateCallback?.(this.lobbyState);
         }
+        if (this.gameStarted) {
+          // During gameplay, don't close peer connections based on signaling state.
+          // The signaling WebSocket can close independently (idle timeout, etc.)
+          // without affecting the WebRTC peer connection which is still alive.
+          break;
+        }
         this.peers.get(msg.playerId)?.close();
         this.peers.delete(msg.playerId);
         this.onPeerDisconnectedCallback?.(msg.playerId);
@@ -186,8 +198,14 @@ export class NetworkController {
         this.handlePeerSignal(msg.from, msg.data);
         break;
 
+      case 'relay':
+        // Game data relayed through signaling (WebRTC fallback)
+        this.handlePeerMessage(msg.data, msg.from);
+        break;
+
       case 'start-game':
-        if (!this.isHost && msg.state && msg.playerAssignments) {
+        if (!this.isHost && !this.gameStarted && msg.state && msg.playerAssignments) {
+          this.gameStarted = true;
           const myElemental = msg.playerAssignments[this.localId];
           if (myElemental) {
             this.onGameStartCallback?.(msg.state, myElemental);
@@ -203,13 +221,19 @@ export class NetworkController {
 
   private createPeer(remoteId: string, initiator: boolean) {
     const peer = new PeerConnection(this.signaling, this.localId, remoteId);
+    let wasEverConnected = false;
 
     peer.onConnected(() => {
+      wasEverConnected = true;
       this.onPeerConnectedCallback?.(remoteId);
     });
 
     peer.onDisconnected(() => {
-      this.onPeerDisconnectedCallback?.(remoteId);
+      // Only show disconnect if this peer previously had a working WebRTC connection.
+      // If WebRTC never connected (NAT issues), signaling relay is used instead.
+      if (wasEverConnected) {
+        this.onPeerDisconnectedCallback?.(remoteId);
+      }
     });
 
     peer.onMessage((data: NetworkMessage) => {
@@ -245,8 +269,11 @@ export class NetworkController {
         this.onRemoteStateCallback?.(msg.data);
         break;
       case 'game-start':
-        const myElemental = msg.playerAssignments[this.localId];
-        this.onGameStartCallback?.(msg.state, myElemental);
+        if (!this.gameStarted) {
+          this.gameStarted = true;
+          const myElemental = msg.playerAssignments[this.localId];
+          this.onGameStartCallback?.(msg.state, myElemental);
+        }
         break;
     }
   }

@@ -7,21 +7,9 @@ import { SignalingClient } from './SignalingClient';
 const ICE_SERVERS: RTCIceServer[] = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
-  {
-    urls: 'turn:openrelay.metered.ca:80',
-    username: 'openrelayproject',
-    credential: 'openrelayproject',
-  },
-  {
-    urls: 'turn:openrelay.metered.ca:443',
-    username: 'openrelayproject',
-    credential: 'openrelayproject',
-  },
-  {
-    urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-    username: 'openrelayproject',
-    credential: 'openrelayproject',
-  },
+  { urls: 'stun:stun2.l.google.com:19302' },
+  { urls: 'stun:stun3.l.google.com:19302' },
+  { urls: 'stun:stun4.l.google.com:19302' },
 ];
 
 export class PeerConnection {
@@ -33,6 +21,7 @@ export class PeerConnection {
   private _connected = false;
   private sendQueue: string[] = [];
   private keepaliveTimer: ReturnType<typeof setInterval> | null = null;
+  private disconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     private signaling: SignalingClient,
@@ -53,10 +42,15 @@ export class PeerConnection {
     this.pc.onconnectionstatechange = () => {
       if (this.pc.connectionState === 'connected') {
         this._connected = true;
+        this.clearDisconnectTimer();
         this.onConnectedCallback?.();
-      } else if (this.pc.connectionState === 'disconnected' || this.pc.connectionState === 'failed') {
+      } else if (this.pc.connectionState === 'failed') {
         this._connected = false;
+        this.clearDisconnectTimer();
         this.onDisconnectedCallback?.();
+      } else if (this.pc.connectionState === 'disconnected') {
+        // 'disconnected' is transient — wait before treating as real disconnect
+        this.startDisconnectTimer();
       }
     };
 
@@ -67,6 +61,10 @@ export class PeerConnection {
 
   get connected(): boolean {
     return this._connected;
+  }
+
+  get channelOpen(): boolean {
+    return this.channel !== null && this.channel.readyState === 'open';
   }
 
   onConnected(cb: () => void) {
@@ -129,6 +127,7 @@ export class PeerConnection {
 
   close() {
     this.stopKeepalive();
+    this.clearDisconnectTimer();
     this.channel?.close();
     this.pc.close();
     this._connected = false;
@@ -151,6 +150,25 @@ export class PeerConnection {
     }
   }
 
+  private startDisconnectTimer() {
+    if (this.disconnectTimer) return;
+    this.disconnectTimer = setTimeout(() => {
+      this.disconnectTimer = null;
+      // If still not connected after grace period, treat as real disconnect
+      if (this.pc.connectionState !== 'connected') {
+        this._connected = false;
+        this.onDisconnectedCallback?.();
+      }
+    }, 4000);
+  }
+
+  private clearDisconnectTimer() {
+    if (this.disconnectTimer) {
+      clearTimeout(this.disconnectTimer);
+      this.disconnectTimer = null;
+    }
+  }
+
   private setupChannel(channel: RTCDataChannel) {
     this.channel = channel;
     channel.onopen = () => {
@@ -160,9 +178,11 @@ export class PeerConnection {
       this.onConnectedCallback?.();
     };
     channel.onclose = () => {
-      this._connected = false;
       this.stopKeepalive();
-      this.onDisconnectedCallback?.();
+      if (this._connected) {
+        this._connected = false;
+        this.onDisconnectedCallback?.();
+      }
     };
     channel.onmessage = (e) => {
       try {
