@@ -43,5 +43,8 @@ bun run preview
 - Signaling WebSocket has a 30s keepalive ping to prevent idle timeout
 - WebRTC `disconnected` state has a 4s grace period before triggering disconnect (transient blips are ignored)
 - Game-start messages are deduplicated (sent via both WebRTC + signaling, only first is processed)
+- `isMyTurn` guard in `applyRemoteState` prevents stale/duplicate remote updates from overwriting the active player's in-progress turn
+- Network disconnect events use `console.warn` instead of modal dialogs to avoid overwriting active game dialogs
+- Phase transitions (e.g. SOT skip → CHOOSE_ACTION) clean up all interaction state to prevent stale targets from interfering
 - Deploy signaling: `cd signaling-worker && bun install && bun x wrangler deploy`
 - Override signaling URL: `?server=wss://your-worker.workers.dev`
