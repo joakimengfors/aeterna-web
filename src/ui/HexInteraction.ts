@@ -118,7 +118,10 @@ export class HexInteraction {
     });
 
     this.network.onPeerDisconnected((_peerId) => {
-      this.dialog.showInfo('Disconnected', 'A player has disconnected from the game.');
+      // Don't show a modal dialog for WebRTC disconnect — it overwrites the
+      // current game dialog (confirm, action choice, etc.) and breaks the flow.
+      // The signaling relay fallback keeps the game working without WebRTC.
+      console.warn('[Network] Peer disconnected:', _peerId, '(signaling relay active)');
     });
   }
 
@@ -133,6 +136,16 @@ export class HexInteraction {
   }
 
   private applyRemoteState(stateData: any) {
+    // During our own turn, we are the authority — ignore remote state updates.
+    // This prevents stale/duplicate updates from resetting our in-progress turn.
+    // The check uses the CURRENT (pre-update) state, so the initial transition
+    // TO our turn still gets applied (isMyTurn is false until we apply it).
+    if (this.isMyTurn) {
+      console.log('[Remote] Ignoring state update during our turn (phase=%s)', this.state.phase);
+      return;
+    }
+    console.log('[Remote] Applying remote state, current phase=%s, currentPlayer=%s', this.state.phase, this.state.currentPlayer);
+
     const newState = GameState.fromJSON(stateData);
     newState.localPlayer = this.state.localPlayer;
 
@@ -283,40 +296,51 @@ export class HexInteraction {
   }
 
   private renderAll() {
-    const layout = document.querySelector('.game-layout');
-    if (layout) {
-      layout.className = `game-layout theme-${this.state.currentPlayer}${this.state.playerCount === 4 ? ' four-player' : ''}`;
-    }
+    try {
+      console.log('[renderAll] phase=%s, currentPlayer=%s, localPlayer=%s, isMyTurn=%s',
+        this.state.phase, this.state.currentPlayer, this.state.localPlayer, this.isMyTurn);
 
-    this.board.render(this.state);
-    this.board.clearHighlights();
-    this.playerPanel.render(this.state);
-    this.topBar.render(this.state);
-    this.dialog.hide();
-    this.dialog.setTheme(this.state.currentPlayer);
+      const layout = document.querySelector('.game-layout');
+      if (layout) {
+        layout.className = `game-layout theme-${this.state.currentPlayer}${this.state.playerCount === 4 ? ' four-player' : ''}`;
+      }
 
-    // In multiplayer, show waiting message when it's not our turn
-    if (this.isMultiplayer && !this.isMyTurn) {
-      const waitingName = NAMES[this.state.currentPlayer];
-      this.dialog.showInfo(`Waiting for ${waitingName}...`, `${waitingName} is taking their turn.`);
-      return;
-    }
+      this.board.render(this.state);
+      this.board.clearHighlights();
+      this.playerPanel.render(this.state);
+      this.topBar.render(this.state);
+      this.dialog.hide();
+      this.dialog.setTheme(this.state.currentPlayer);
 
-    // Auto-start SOT ability when entering START_OF_TURN
-    if (this.state.phase === 'START_OF_TURN') {
-      this.onSOTStart();
-    }
-    // Show action choice dialog when entering CHOOSE_ACTION
-    else if (this.state.phase === 'CHOOSE_ACTION') {
-      const actions = getActionsForElemental(this.state.currentPlayer);
-      const player = this.state.getPlayer(this.state.currentPlayer);
-      const specialCard = this.state.specialDeck.activeCard;
-      this.dialog.showActionChoice(
-        actions,
-        player.actionMarker,
-        specialCard ? specialCard.name : null,
-        (actionId) => this.onActionSelected(actionId),
-      );
+      // In multiplayer, show waiting message when it's not our turn
+      if (this.isMultiplayer && !this.isMyTurn) {
+        const waitingName = NAMES[this.state.currentPlayer];
+        console.log('[renderAll] Not my turn, showing waiting dialog for', waitingName);
+        this.dialog.showInfo(`Waiting for ${waitingName}...`, `${waitingName} is taking their turn.`);
+        return;
+      }
+
+      // Auto-start SOT ability when entering START_OF_TURN
+      if (this.state.phase === 'START_OF_TURN') {
+        console.log('[renderAll] Starting SOT for', this.state.currentPlayer);
+        this.onSOTStart();
+      }
+      // Show action choice dialog when entering CHOOSE_ACTION
+      else if (this.state.phase === 'CHOOSE_ACTION') {
+        const actions = getActionsForElemental(this.state.currentPlayer);
+        const player = this.state.getPlayer(this.state.currentPlayer);
+        const specialCard = this.state.specialDeck.activeCard;
+        console.log('[renderAll] Showing action choice, actions=%d, blocked=%s',
+          actions.length, player.actionMarker);
+        this.dialog.showActionChoice(
+          actions,
+          player.actionMarker,
+          specialCard ? specialCard.name : null,
+          (actionId) => this.onActionSelected(actionId),
+        );
+      }
+    } catch (err) {
+      console.error('[renderAll] Error:', err);
     }
   }
 
@@ -385,6 +409,13 @@ export class HexInteraction {
   }
 
   private onSOTSkip() {
+    console.log('[SOT] Skip pressed, transitioning to CHOOSE_ACTION');
+    // Clean up SOT interaction state to prevent stale targets from interfering
+    this.validTargets = [];
+    this.savedState = null;
+    this.currentStep = 0;
+    this.state.pendingAction = null;
+    this.state.stepInstruction = '';
     this.state.phase = 'CHOOSE_ACTION';
     this.state.sotUsed = false;
     this.renderAll();
@@ -641,6 +672,9 @@ export class HexInteraction {
     if (this.isMultiplayer && !this.isMyTurn) return;
     if (!this.validTargets.includes(hexId)) return;
 
+    console.log('[HexClick] hexId=%s, phase=%s, selectedAction=%s, validTargets=%d',
+      hexId, this.state.phase, this.selectedAction, this.validTargets.length);
+
     // Auto-dismiss any non-blocking info dialog
     this.dialog.hide();
 
@@ -722,6 +756,9 @@ export class HexInteraction {
               this.startForcedMovePhase(() => this.finishSOT());
               return;
             }
+            this.finishSOT();
+          }).catch(err => {
+            console.error('[SOT] Animation/finishSOT error:', err);
             this.finishSOT();
           });
         },
@@ -1284,6 +1321,11 @@ export class HexInteraction {
       const cb = this.postForcedMoveCallback;
       this.postForcedMoveCallback = null;
       if (cb) cb();
+    }).catch(err => {
+      console.error('[ForcedMove] Animation error:', err);
+      const cb = this.postForcedMoveCallback;
+      this.postForcedMoveCallback = null;
+      if (cb) cb();
     });
   }
 
@@ -1311,6 +1353,9 @@ export class HexInteraction {
             this.startForcedMovePhase(() => this.finishTurn());
             return;
           }
+          this.finishTurn();
+        }).catch(err => {
+          console.error('[FlameDash] Animation error:', err);
           this.finishTurn();
         });
         return;
@@ -1365,6 +1410,9 @@ export class HexInteraction {
           });
           return;
         }
+        this.finishActionWithFogCheck();
+      }).catch(err => {
+        console.error('[Action] Animation error:', err);
         this.finishActionWithFogCheck();
       });
     } else if (this.state.phase === 'EXECUTING' && this.selectedAction === 'landslide' && this.currentStep === 1) {

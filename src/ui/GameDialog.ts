@@ -128,7 +128,11 @@ export class GameDialog {
       </div>
     `;
 
-    this.content.querySelectorAll('.dialog-action-card[data-action]').forEach(el => {
+    const actionCards = this.content.querySelectorAll('.dialog-action-card[data-action]');
+    console.log('[Dialog] showActionChoice — %d action cards, %d blocked',
+      actionCards.length,
+      this.content.querySelectorAll('.dialog-action-card.blocked').length);
+    actionCards.forEach(el => {
       if (el.classList.contains('blocked')) return;
       el.addEventListener('click', () => {
         const id = el.getAttribute('data-action') as ActionId;
@@ -235,10 +239,8 @@ export class GameDialog {
     // Non-blocking: let clicks pass through to hexes, auto-dismissed on next hex click
     this.overlay.style.pointerEvents = 'none';
     this.content.style.pointerEvents = 'auto';
-    // Click dialog itself to dismiss (but not the cancel button area)
-    if (!onCancel) {
-      this.content.addEventListener('click', () => this.hide(), { once: true });
-    }
+    // Info dialogs are dismissed by hex clicks (via onHexClick → dialog.hide())
+    // or by renderAll() — no need for click-to-dismiss on the dialog itself.
     this.show();
   }
 
@@ -365,12 +367,18 @@ export class GameDialog {
     // Force reflow for animation
     this.overlay.offsetHeight;
     this.overlay.classList.add('dialog-visible');
+    console.log('[Dialog] show() — title:', this.content.querySelector('.dialog-title')?.textContent || '(no title)',
+      'pointerEvents:', this.overlay.style.pointerEvents || 'CSS default');
     // Focus first button
     const btn = this.content.querySelector('button') as HTMLElement | null;
     if (btn) btn.focus();
   }
 
   hide() {
+    const wasVisible = this.overlay.classList.contains('dialog-visible');
+    if (wasVisible) {
+      console.log('[Dialog] hide() — was visible, content:', this.content.querySelector('.dialog-title')?.textContent || '(no title)');
+    }
     this.overlay.classList.remove('dialog-visible');
     this.overlay.style.display = 'none';
     this.overlay.style.pointerEvents = '';
