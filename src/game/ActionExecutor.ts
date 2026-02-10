@@ -758,6 +758,15 @@ export class ActionExecutor {
       }
     }
 
+    // Check if fire was placed on Earth's hex — forced move
+    const earth = this.state.getPlayer('earth');
+    for (const hex of placed) {
+      if (hex === earth.hexId) {
+        this.handleFireOnEarth();
+        break;
+      }
+    }
+
     return `Firewall — placed Fire on hex${placed.length > 1 ? 'es' : ''} ${placed.join(', ')}`;
   }
 
@@ -914,12 +923,18 @@ export class ActionExecutor {
   executeAshToLush(targets: HexId[]): string {
     const fire = this.state.getPlayer('fire');
     const supply = fire.supplies.fire ?? 0;
+    const earth = this.state.getPlayer('earth');
 
     if (supply > 0 && targets.length === 1) {
       if (this.state.takeFromSupply('fire', 'fire')) {
         this.state.addToken(targets[0], 'fire');
       }
       this.state.addLog(`Aeterna placed Fire on hex ${targets[0]}.`);
+
+      // Check if fire was placed on Earth's hex — forced move
+      if (targets[0] === earth.hexId) {
+        this.handleFireOnEarth();
+      }
 
       const winner = checkWinConditions(this.state);
       if (winner) this.state.winner = winner;
@@ -929,6 +944,11 @@ export class ActionExecutor {
       this.state.removeToken(targets[0], 'fire');
       this.state.addToken(targets[1], 'fire');
       this.state.addLog(`Aeterna moved Fire from hex ${targets[0]} to hex ${targets[1]}.`);
+
+      // Check if fire was moved onto Earth's hex — forced move
+      if (targets[1] === earth.hexId) {
+        this.handleFireOnEarth();
+      }
 
       const winner = checkWinConditions(this.state);
       if (winner) this.state.winner = winner;
