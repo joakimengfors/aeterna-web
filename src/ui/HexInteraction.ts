@@ -262,24 +262,24 @@ export class HexInteraction {
     this.applyNewState(newState, prevPlayer);
   }
 
-  /** Show a floating action label overlay (e.g. "Krakatoa used Firestorm") */
+  /** Show a speech-bubble action label next to the acting player's card */
   private showActionLabelOverlay(label: string, player: ElementalType) {
     this.removeActionLabelOverlay(true);
-    // Parse "Name used Action" into structured parts
     const match = label.match(/^(.+?) used (.+)$/);
+    const actionName = match ? match[2] : label;
+
     const el = document.createElement('div');
     el.className = `action-label-overlay theme-${player}`;
-    if (match) {
-      el.innerHTML = `
-        <span class="action-label-line"></span>
-        <div class="action-label-content">
-          <span class="action-label-name">${match[1]}</span>
-          <span class="action-label-action">${match[2]}</span>
-        </div>
-        <span class="action-label-line"></span>`;
-    } else {
-      el.textContent = label;
+    el.innerHTML = `<span class="action-label-arrow"></span><span class="action-label-text">${actionName}</span>`;
+
+    // Position next to the acting player's card
+    const card = document.querySelector(`.player-card.theme-${player}`);
+    if (card) {
+      const rect = card.getBoundingClientRect();
+      el.style.top = `${rect.top + rect.height / 2}px`;
+      el.style.left = `${rect.right + 12}px`;
     }
+
     document.body.appendChild(el);
     this.actionLabelEl = el;
     this.actionLabelShownAt = Date.now();
