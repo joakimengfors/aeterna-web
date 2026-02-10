@@ -72,6 +72,7 @@ export class HexInteraction {
   // Action label for remote animation display (e.g. "Krakatoa used Firestorm")
   private lastActionLabel: string | null = null;
   private actionLabelEl: HTMLElement | null = null;
+  private actionLabelShownAt = 0;
 
   // Network
   private network: NetworkController | null = null;
@@ -269,19 +270,25 @@ export class HexInteraction {
     el.textContent = label;
     document.body.appendChild(el);
     this.actionLabelEl = el;
+    this.actionLabelShownAt = Date.now();
   }
 
-  /** Fade out and remove the action label overlay */
+  /** Fade out and remove the action label overlay (respects minimum display time) */
   private removeActionLabelOverlay(immediate = false) {
     if (!this.actionLabelEl) return;
     const el = this.actionLabelEl;
     this.actionLabelEl = null;
     if (immediate) {
       el.remove();
-    } else {
+      return;
+    }
+    const elapsed = Date.now() - this.actionLabelShownAt;
+    const minDisplay = 1500;
+    const delay = Math.max(0, minDisplay - elapsed);
+    setTimeout(() => {
       el.classList.add('fade-out');
       setTimeout(() => el.remove(), 500);
-    }
+    }, delay);
   }
 
   /** Apply a deserialized remote state and trigger appropriate UI updates */
