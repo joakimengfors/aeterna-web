@@ -272,12 +272,15 @@ export class HexInteraction {
     el.className = `action-label-overlay theme-${player}`;
     el.innerHTML = `<span class="action-label-arrow"></span><span class="action-label-text">${actionName}</span>`;
 
-    // Position next to the acting player's card
+    // Position next to the player's avatar image
     const card = document.querySelector(`.player-card.theme-${player}`);
     if (card) {
-      const rect = card.getBoundingClientRect();
+      const avatar = card.querySelector('.player-avatar');
+      const ref = avatar || card;
+      const rect = ref.getBoundingClientRect();
+      const cardRect = card.getBoundingClientRect();
       el.style.top = `${rect.top + rect.height / 2}px`;
-      el.style.left = `${rect.right + 12}px`;
+      el.style.left = `${cardRect.right + 12}px`;
     }
 
     document.body.appendChild(el);
