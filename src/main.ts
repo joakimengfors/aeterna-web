@@ -16,10 +16,6 @@ import './assets/styles.css';
 // Default signaling server URL — override via ?server= query param
 const DEFAULT_SIGNALING_URL = 'wss://aeterna-signaling.joakim-engfors.workers.dev';
 
-// Reference resolution for the game layout (16:9)
-const REF_WIDTH = 1920;
-const REF_HEIGHT = 1080;
-
 function getSignalingUrl(): string {
   const params = new URLSearchParams(window.location.search);
   return params.get('server') || DEFAULT_SIGNALING_URL;
@@ -27,33 +23,14 @@ function getSignalingUrl(): string {
 
 function init() {
   const menuEl = document.getElementById('main-menu')!;
-  const gameViewport = document.querySelector('.game-viewport') as HTMLElement;
   const gameLayout = document.querySelector('.game-layout') as HTMLElement;
 
   let network: NetworkController | null = null;
 
-  // Scale the game layout to fit the viewport while maintaining 16:9 aspect ratio
-  function updateGameScale() {
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    const scale = Math.min(vw / REF_WIDTH, vh / REF_HEIGHT);
-    gameLayout.style.transform = `scale(${scale})`;
-  }
-  window.addEventListener('resize', updateGameScale);
-
-  function showGame() {
-    gameViewport.style.display = 'flex';
-    updateGameScale();
-  }
-
-  function hideGame() {
-    gameViewport.style.display = 'none';
-  }
-
   const menu = new MainMenu(menuEl, {
     onLocalPlay: (playerCount: number) => {
       menu.hide();
-      showGame();
+      gameLayout.style.display = '';
       startLocalGame(playerCount);
     },
 
@@ -86,7 +63,7 @@ function init() {
         });
         network.onGameStart((stateData, localElemental) => {
           menu.hide();
-          showGame();
+          gameLayout.style.display = '';
           startMultiplayerGame(stateData, localElemental, network!);
         });
         await network.joinRoom(code);
@@ -115,7 +92,7 @@ function init() {
       network.startGame(state, assignments);
 
       menu.hide();
-      showGame();
+      gameLayout.style.display = '';
       startMultiplayerGame(GameState.toJSON(state), state.localPlayer!, network);
     },
 
@@ -155,7 +132,7 @@ function init() {
 
     const interaction = new HexInteraction(state, board, playerPanel, topBar, dialog, net);
     interaction.onReturnToLobbyCallback = () => {
-      hideGame();
+      gameLayout.style.display = 'none';
       menuEl.style.display = '';
       menu.setScreen(net.isHost ? 'host-lobby' : 'join-lobby');
     };
