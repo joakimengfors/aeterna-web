@@ -51,7 +51,8 @@ export class GameDialog {
       <div class="dialog-backdrop"></div>
       <div class="dialog-content"></div>
     `;
-    document.body.appendChild(this.overlay);
+    const gameLayout = document.querySelector('.game-layout')!;
+    gameLayout.appendChild(this.overlay);
 
     this.content = this.overlay.querySelector('.dialog-content')!;
 

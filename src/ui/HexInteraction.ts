@@ -1613,7 +1613,8 @@ export class HexInteraction {
     const banner = document.createElement('div');
     banner.className = 'turn-banner';
     banner.innerHTML = `<div class="turn-banner-text">${name}'s Turn!</div>`;
-    document.body.appendChild(banner);
+    const gameLayout = document.querySelector('.game-layout')!;
+    gameLayout.appendChild(banner);
 
     // Remove banner after animation; show UI immediately
     setTimeout(() => banner.remove(), 1600);

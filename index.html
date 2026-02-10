@@ -10,15 +10,26 @@
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         /* Layout */
+        .game-viewport {
+            position: fixed;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+            overflow: hidden;
+        }
         .game-layout {
             display: grid;
             grid-template-columns: 384px 1fr;
             grid-template-rows: auto 1fr;
-            height: 100dvh;
-            width: 100vw;
+            width: 1920px;
+            height: 1080px;
             gap: 0;
             overflow: hidden;
             background: var(--bg-darkest);
+            transform-origin: center center;
+            position: relative;
         }
         .game-layout.four-player {
             grid-template-columns: 768px 1fr;
@@ -507,7 +518,7 @@
 
         /* Game dialog modal */
         .dialog-overlay {
-            position: fixed; inset: 0; z-index: 5000;
+            position: absolute; inset: 0; z-index: 5000;
             display: flex; align-items: center; justify-content: flex-end; padding-right: 40px;
             opacity: 0; transition: opacity 0.2s ease;
             pointer-events: none;
@@ -1224,7 +1235,7 @@
 
         /* Turn banner flash */
         .turn-banner {
-            position: fixed; inset: 0; z-index: 1;
+            position: absolute; inset: 0; z-index: 5001;
             display: flex; align-items: center; justify-content: center;
             pointer-events: none;
             animation: banner-lifecycle 1.6s ease forwards;
@@ -1557,14 +1568,16 @@
 
     <div id="main-menu"></div>
 
-    <div class="game-layout theme-earth" style="display:none">
-        <div id="top-bar"></div>
-        <div id="left-panel"></div>
-        <div id="map-area">
-            <div class="corner-frame tl"></div>
-            <div class="corner-frame tr"></div>
-            <div class="corner-frame bl"></div>
-            <div class="corner-frame br"></div>
+    <div class="game-viewport">
+        <div class="game-layout theme-earth">
+            <div id="top-bar"></div>
+            <div id="left-panel"></div>
+            <div id="map-area">
+                <div class="corner-frame tl"></div>
+                <div class="corner-frame tr"></div>
+                <div class="corner-frame bl"></div>
+                <div class="corner-frame br"></div>
+            </div>
         </div>
     </div>
     <!-- Position Tuner -->
