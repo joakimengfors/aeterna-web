@@ -1571,11 +1571,28 @@ export class HexInteraction {
         this.queueMoveAnimation(el1, hex1, hex2);
         this.state.setElementalOnHex(hex1, el2);
         this.state.setElementalOnHex(hex2, el1);
+
+        // Check if earth was swapped onto a hex with fire tokens → forced move
+        const earthHex = this.state.getPlayer('earth').hexId;
+        const earthHexState = this.state.getHex(earthHex);
+        if (earthHexState.tokens.includes('fire')) {
+          this.executor.handleFireOnEarth();
+        }
+
         this.state.addLog(`Swap Places — ${NAMES[el1]} and ${NAMES[el2]} swapped positions`);
         this.turnMgr.setActionMarker(this.selectedAction);
         this.activeSpecialCardId = null;
+
+        if (this.checkWin()) return;
         this.board.render(this.state);
         this.playPendingAnimation().then(() => {
+          if (this.state.pendingForcedMove) {
+            this.startForcedMovePhase(() => this.finishTurn());
+            return;
+          }
+          this.finishTurn();
+        }).catch(err => {
+          console.error('[SwapPlaces] Animation error:', err);
           this.finishTurn();
         });
         return;
