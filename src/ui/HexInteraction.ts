@@ -640,7 +640,7 @@ export class HexInteraction {
     // Build action label for remote animation display
     const playerName = NAMES[this.state.currentPlayer];
     const actionName = actionId === 'special'
-      ? (this.state.specialDeck.activeCard?.name || 'Special Ability')
+      ? `SPECIAL: ${this.state.specialDeck.activeCard?.name || 'Special Ability'}`
       : this.getActionDisplayName(actionId);
     this.lastActionLabel = `${playerName} used ${actionName}`;
 
