@@ -1271,8 +1271,7 @@
             display: flex;
             align-items: center;
             transform: translateY(-50%);
-            animation: action-label-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards,
-                       action-label-idle 2.5s ease-in-out 0.4s infinite;
+            animation: action-label-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
         .action-label-arrow {
             display: block;
@@ -1303,6 +1302,21 @@
                 inset 0 1px 0 rgba(255,255,255,0.06);
             text-shadow: 0 0 12px var(--el-glow), 0 1px 2px rgba(0,0,0,0.8);
             animation: action-label-glow 2s ease-in-out infinite alternate;
+            position: relative;
+            overflow: hidden;
+            clip-path: inset(0 100% 0 0);
+            animation: action-label-reveal 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.15s forwards,
+                       action-label-glow 2s ease-in-out 0.65s infinite alternate;
+        }
+        .action-label-text::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 60%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent);
+            animation: action-label-shimmer 0.6s ease 0.5s forwards;
         }
         .action-label-overlay.fade-out {
             animation: action-label-out 0.4s ease forwards;
@@ -1311,9 +1325,13 @@
             0% { opacity: 0; transform: translateY(-50%) translateX(-10px) scale(0.9); }
             100% { opacity: 1; transform: translateY(-50%) translateX(0) scale(1); }
         }
-        @keyframes action-label-idle {
-            0%, 100% { transform: translateY(-50%) translateX(0); }
-            50% { transform: translateY(calc(-50% - 3px)) translateX(2px); }
+        @keyframes action-label-reveal {
+            0% { clip-path: inset(0 100% 0 0); }
+            100% { clip-path: inset(0 0% 0 0); }
+        }
+        @keyframes action-label-shimmer {
+            0% { left: -60%; }
+            100% { left: 120%; }
         }
         @keyframes action-label-out {
             0% { opacity: 1; transform: translateY(-50%) translateX(0) scale(1); }
