@@ -1271,7 +1271,8 @@
             display: flex;
             align-items: center;
             transform: translateY(-50%);
-            animation: action-label-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            animation: action-label-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards,
+                       action-label-idle 2.5s ease-in-out 0.4s infinite;
         }
         .action-label-arrow {
             display: block;
@@ -1309,6 +1310,10 @@
         @keyframes action-label-in {
             0% { opacity: 0; transform: translateY(-50%) translateX(-10px) scale(0.9); }
             100% { opacity: 1; transform: translateY(-50%) translateX(0) scale(1); }
+        }
+        @keyframes action-label-idle {
+            0%, 100% { transform: translateY(-50%) translateX(0); }
+            50% { transform: translateY(calc(-50% - 3px)) translateX(2px); }
         }
         @keyframes action-label-out {
             0% { opacity: 1; transform: translateY(-50%) translateX(0) scale(1); }
