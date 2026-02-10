@@ -60,8 +60,6 @@ export class TopBar {
             </div>
           </div>
           <div class="top-actions">
-            <button class="top-btn" title="Game Rules"><span class="material-icons">menu_book</span></button>
-            <button class="top-btn" title="Settings"><span class="material-icons">settings</span></button>
             <button class="top-btn" title="Fullscreen" id="fullscreen-btn"><span class="material-icons">fullscreen</span></button>
             <button class="top-btn" title="Back to Menu" id="menu-btn"><span class="material-icons">home</span></button>
           </div>
