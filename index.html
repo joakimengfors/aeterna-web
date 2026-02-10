@@ -1263,6 +1263,44 @@
             100% { transform: scale(1.1); }
         }
 
+        /* Action label overlay (shown during remote animations) */
+        .action-label-overlay {
+            position: fixed;
+            top: 18%;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            pointer-events: none;
+            font-family: var(--font-display);
+            font-size: clamp(18px, 2.5vw, 32px);
+            font-weight: 700;
+            color: var(--el-primary);
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            white-space: nowrap;
+            text-shadow:
+                0 0 20px var(--el-glow),
+                0 0 40px var(--el-glow),
+                0 2px 4px rgba(0,0,0,0.9);
+            padding: 10px 36px;
+            background: linear-gradient(180deg, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.55) 100%);
+            border-top: 2px solid var(--el-primary);
+            border-bottom: 2px solid var(--el-primary);
+            box-shadow: 0 0 30px rgba(0,0,0,0.5), 0 0 15px var(--el-glow);
+            animation: action-label-in 0.4s ease forwards;
+        }
+        .action-label-overlay.fade-out {
+            animation: action-label-out 0.5s ease forwards;
+        }
+        @keyframes action-label-in {
+            0% { opacity: 0; transform: translateX(-50%) scale(0.85); }
+            100% { opacity: 1; transform: translateX(-50%) scale(1); }
+        }
+        @keyframes action-label-out {
+            0% { opacity: 1; transform: translateX(-50%) scale(1); }
+            100% { opacity: 0; transform: translateX(-50%) scale(1.05); }
+        }
+
         /* Corner frames */
         .corner-frame {
             position: absolute; width: 40px; height: 40px;

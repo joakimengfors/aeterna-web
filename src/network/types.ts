@@ -42,7 +42,7 @@ export type TurnAnimationData =
 export type NetworkMessage =
   | { type: 'full-state'; data: any }
   | { type: 'action'; intent: ActionIntent }
-  | { type: 'state-update'; data: any; animations?: TurnAnimationData[] }
+  | { type: 'state-update'; data: any; animations?: TurnAnimationData[]; actionLabel?: string }
   | { type: 'lobby-update'; lobby: LobbyState }
   | { type: 'game-start'; state: any; playerAssignments: Record<string, ElementalType> }
   | { type: 'rematch-request'; playerId: string }

@@ -69,6 +69,8 @@ export class HexInteraction {
   private turnAnimations: TurnAnimationData[] = [];
   // Generation counter: incremented on each applyRemoteState to invalidate stale animations
   private remoteAnimGeneration = 0;
+  // Action label for remote animation display (e.g. "Krakatoa used Firestorm")
+  private lastActionLabel: string | null = null;
 
   // Network
   private network: NetworkController | null = null;
@@ -129,16 +131,16 @@ export class HexInteraction {
     if (!this.network) return;
 
     // Both host and guest receive state updates
-    this.network.onRemoteState((data, animations, fromId) => {
+    this.network.onRemoteState((data, animations, fromId, actionLabel) => {
       if (this.network!.isHost) {
         // Host received state from a guest who finished their turn — validate & rebroadcast
-        this.applyRemoteState(data, animations);
+        this.applyRemoteState(data, animations, actionLabel);
         // Re-broadcast with animations so other guests see them too
         // Exclude the sender — they already played the animations locally
-        this.network!.broadcastState(this.state, animations, fromId);
+        this.network!.broadcastState(this.state, animations, fromId, actionLabel);
       } else {
         // Guest received authoritative state from host
-        this.applyRemoteState(data, animations);
+        this.applyRemoteState(data, animations, actionLabel);
       }
     });
 
@@ -172,15 +174,17 @@ export class HexInteraction {
   private syncState() {
     if (!this.network) return;
     const animations = this.turnAnimations.length > 0 ? [...this.turnAnimations] : undefined;
+    const actionLabel = this.lastActionLabel ?? undefined;
     this.turnAnimations = [];
+    this.lastActionLabel = null;
     if (this.network.isHost) {
-      this.network.broadcastState(this.state, animations);
+      this.network.broadcastState(this.state, animations, undefined, actionLabel);
     } else {
-      this.network.sendStateToHost(this.state, animations);
+      this.network.sendStateToHost(this.state, animations, actionLabel);
     }
   }
 
-  private applyRemoteState(stateData: any, animations?: TurnAnimationData[]) {
+  private applyRemoteState(stateData: any, animations?: TurnAnimationData[], actionLabel?: string) {
     // During our own turn, we are the authority — ignore remote state updates.
     // This prevents stale/duplicate updates from resetting our in-progress turn.
     // The check uses the CURRENT (pre-update) state, so the initial transition
@@ -205,7 +209,7 @@ export class HexInteraction {
 
     if (shouldAnimate) {
       // Play animations on the OLD DOM state, then apply new state after
-      this.playRemoteAnimations(animations, newState, prevPlayer);
+      this.playRemoteAnimations(animations, newState, prevPlayer, actionLabel);
     } else {
       this.applyNewState(newState, prevPlayer);
     }
@@ -216,13 +220,21 @@ export class HexInteraction {
     animations: TurnAnimationData[],
     newState: GameState,
     prevPlayer: ElementalType,
+    actionLabel?: string,
   ) {
     const gen = this.remoteAnimGeneration;
+
+    // Show action label overlay during animations
+    let labelEl: HTMLElement | null = null;
+    if (actionLabel) {
+      labelEl = this.showActionLabelOverlay(actionLabel, prevPlayer);
+    }
 
     for (const anim of animations) {
       // Check if invalidated by a newer state update
       if (this.remoteAnimGeneration !== gen) {
         console.log('[Remote] Animation sequence superseded (gen %d → %d)', gen, this.remoteAnimGeneration);
+        labelEl?.remove();
         return;
       }
 
@@ -237,6 +249,12 @@ export class HexInteraction {
       }
     }
 
+    // Fade out and remove label
+    if (labelEl) {
+      labelEl.classList.add('fade-out');
+      setTimeout(() => labelEl?.remove(), 500);
+    }
+
     // Final check before applying state
     if (this.remoteAnimGeneration !== gen) {
       console.log('[Remote] Animation sequence completed but was superseded');
@@ -244,6 +262,17 @@ export class HexInteraction {
     }
 
     this.applyNewState(newState, prevPlayer);
+  }
+
+  /** Show a floating action label overlay (e.g. "Krakatoa used Firestorm") */
+  private showActionLabelOverlay(label: string, player: ElementalType): HTMLElement {
+    // Remove any existing label
+    document.querySelector('.action-label-overlay')?.remove();
+    const el = document.createElement('div');
+    el.className = `action-label-overlay theme-${player}`;
+    el.textContent = label;
+    document.body.appendChild(el);
+    return el;
   }
 
   /** Apply a deserialized remote state and trigger appropriate UI updates */
@@ -560,6 +589,13 @@ export class HexInteraction {
     this.firestormExtendedGroupIds.clear();
     this.firestormMaxTokens = 0;
     this.waterHexBeforeMosey = null;
+
+    // Build action label for remote animation display
+    const playerName = NAMES[this.state.currentPlayer];
+    const actionName = actionId === 'special'
+      ? (this.state.specialDeck.activeCard?.name || 'Special Ability')
+      : this.getActionDisplayName(actionId);
+    this.lastActionLabel = `${playerName} used ${actionName}`;
 
     if (actionId === 'special') {
       this.handleSpecialAbility();
@@ -1623,6 +1659,7 @@ export class HexInteraction {
   private onUndo() {
     this.dialog.hide();
     this.turnAnimations = [];
+    this.lastActionLabel = null;
 
     const wasSOT = !this.selectedAction && this.state.phase === 'EXECUTING';
 

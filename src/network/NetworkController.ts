@@ -22,7 +22,7 @@ export class NetworkController {
   // Callbacks
   private onLobbyUpdateCallback: ((lobby: LobbyState) => void) | null = null;
   private onGameStartCallback: ((state: any, localElemental: ElementalType) => void) | null = null;
-  private onRemoteStateCallback: ((state: any, animations?: TurnAnimationData[], fromId?: string) => void) | null = null;
+  private onRemoteStateCallback: ((state: any, animations?: TurnAnimationData[], fromId?: string, actionLabel?: string) => void) | null = null;
   private onActionIntentCallback: ((intent: ActionIntent, fromId: string) => void) | null = null;
   private onErrorCallback: ((msg: string) => void) | null = null;
   private onPeerConnectedCallback: ((peerId: string) => void) | null = null;
@@ -56,7 +56,7 @@ export class NetworkController {
 
   onLobbyUpdate(cb: (lobby: LobbyState) => void) { this.onLobbyUpdateCallback = cb; }
   onGameStart(cb: (state: any, localElemental: ElementalType) => void) { this.onGameStartCallback = cb; }
-  onRemoteState(cb: (state: any, animations?: TurnAnimationData[], fromId?: string) => void) { this.onRemoteStateCallback = cb; }
+  onRemoteState(cb: (state: any, animations?: TurnAnimationData[], fromId?: string, actionLabel?: string) => void) { this.onRemoteStateCallback = cb; }
   onActionIntent(cb: (intent: ActionIntent, fromId: string) => void) { this.onActionIntentCallback = cb; }
   onError(cb: (msg: string) => void) { this.onErrorCallback = cb; }
   onPeerConnected(cb: (peerId: string) => void) { this.onPeerConnectedCallback = cb; }
@@ -112,10 +112,10 @@ export class NetworkController {
   }
 
   /** Host broadcasts state to all guests (optionally excluding one peer, e.g. the sender) */
-  broadcastState(state: GameState, animations?: TurnAnimationData[], excludePeerId?: string) {
+  broadcastState(state: GameState, animations?: TurnAnimationData[], excludePeerId?: string, actionLabel?: string) {
     if (!this.isHost) return;
     const stateData = GameState.toJSON(state);
-    const msgWithAnim: NetworkMessage = { type: 'state-update', data: stateData, animations };
+    const msgWithAnim: NetworkMessage = { type: 'state-update', data: stateData, animations, actionLabel };
     const msgNoAnim: NetworkMessage = { type: 'state-update', data: stateData };
     for (const [peerId, peer] of this.peers) {
       // Don't send animations back to the peer who generated them (they already played locally)
@@ -129,9 +129,9 @@ export class NetworkController {
   }
 
   /** Guest sends state to host after completing their turn */
-  sendStateToHost(state: GameState, animations?: TurnAnimationData[]) {
+  sendStateToHost(state: GameState, animations?: TurnAnimationData[], actionLabel?: string) {
     if (this.isHost) return;
-    const msg: NetworkMessage = { type: 'state-update', data: GameState.toJSON(state), animations };
+    const msg: NetworkMessage = { type: 'state-update', data: GameState.toJSON(state), animations, actionLabel };
     this.sendToAllPeers(msg);
   }
 
@@ -320,7 +320,7 @@ export class NetworkController {
         this.onActionIntentCallback?.(msg.intent, fromId);
         break;
       case 'state-update':
-        this.onRemoteStateCallback?.(msg.data, msg.animations, fromId);
+        this.onRemoteStateCallback?.(msg.data, msg.animations, fromId, msg.actionLabel);
         break;
       case 'full-state':
         this.onRemoteStateCallback?.(msg.data);
