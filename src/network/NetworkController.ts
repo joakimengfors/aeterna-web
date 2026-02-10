@@ -7,6 +7,7 @@ import { PeerConnection } from './PeerConnection';
 import { GameState } from '../game/GameState';
 import type { ElementalType } from '../game/types';
 import type { ActionIntent, LobbyState, NetworkMessage, SignalingMessage, TurnAnimationData } from './types';
+import type { HexId } from '../game/types';
 
 export type NetworkRole = 'host' | 'guest';
 
@@ -30,6 +31,7 @@ export class NetworkController {
   private onReturnToLobbyCallback: (() => void) | null = null;
   private onRematchRequestCallback: ((playerId: string) => void) | null = null;
   private onRematchStartCallback: ((state: any, playerAssignments: Record<string, ElementalType>) => void) | null = null;
+  private onForcedMoveChoiceCallback: ((hexId: HexId, fromId: string) => void) | null = null;
 
   constructor(serverUrl: string, role: NetworkRole) {
     this.signaling = new SignalingClient(serverUrl);
@@ -64,6 +66,7 @@ export class NetworkController {
   onReturnToLobby(cb: () => void) { this.onReturnToLobbyCallback = cb; }
   onRematchRequest(cb: (playerId: string) => void) { this.onRematchRequestCallback = cb; }
   onRematchStart(cb: (state: any, playerAssignments: Record<string, ElementalType>) => void) { this.onRematchStartCallback = cb; }
+  onForcedMoveChoice(cb: (hexId: HexId, fromId: string) => void) { this.onForcedMoveChoiceCallback = cb; }
 
   // --- Connection ---
 
@@ -147,6 +150,12 @@ export class NetworkController {
     this.gameStarted = true;
     const stateData = GameState.toJSON(state);
     const msg: NetworkMessage = { type: 'rematch-start', state: stateData, playerAssignments: assignments };
+    this.sendToAllPeers(msg);
+  }
+
+  /** Earth player sends their forced move choice to all peers */
+  sendForcedMoveChoice(hexId: HexId) {
+    const msg: NetworkMessage = { type: 'forced-move-choice', hexId };
     this.sendToAllPeers(msg);
   }
 
@@ -338,6 +347,21 @@ export class NetworkController {
       case 'rematch-start':
         this.gameStarted = true;
         this.onRematchStartCallback?.(msg.state, msg.playerAssignments);
+        break;
+      case 'forced-move-choice':
+        // Host forwards to all other peers (star topology relay)
+        if (this.isHost) {
+          const fwdMsg: NetworkMessage = { type: 'forced-move-choice', hexId: msg.hexId };
+          for (const [peerId, peer] of this.peers) {
+            if (peerId === fromId) continue;
+            if (peer.channelOpen) {
+              peer.send(fwdMsg);
+            } else {
+              this.signaling.relay(peerId, fwdMsg);
+            }
+          }
+        }
+        this.onForcedMoveChoiceCallback?.(msg.hexId, fromId);
         break;
     }
   }

@@ -74,6 +74,9 @@ export class HexInteraction {
   private actionLabelEl: HTMLElement | null = null;
   private actionLabelShownAt = 0;
 
+  // Forced move: active player waiting for earth's network choice
+  private waitingForForcedMove = false;
+
   // Network
   private network: NetworkController | null = null;
 
@@ -170,6 +173,12 @@ export class HexInteraction {
       this.dialog.hide();
       this.onReturnToLobbyCallback?.();
     });
+
+    this.network.onForcedMoveChoice((hexId, _fromId) => {
+      if (this.waitingForForcedMove) {
+        this.resolveForcedMoveFromNetwork(hexId);
+      }
+    });
   }
 
   /** Send state to the network after a turn ends or game ends */
@@ -191,7 +200,7 @@ export class HexInteraction {
     // This prevents stale/duplicate updates from resetting our in-progress turn.
     // The check uses the CURRENT (pre-update) state, so the initial transition
     // TO our turn still gets applied (isMyTurn is false until we apply it).
-    if (this.isMyTurn) {
+    if (this.isMyTurn && !this.waitingForForcedMove) {
       console.log('[Remote] Ignoring state update during our turn (phase=%s)', this.state.phase);
       return;
     }
@@ -335,8 +344,15 @@ export class HexInteraction {
     this.pendingFogMoves = [];
     this.postFogCallback = null;
     this.postForcedMoveCallback = null;
+    this.waitingForForcedMove = false;
 
     this.executor = new ActionExecutor(this.state);
+
+    // Check if we need to enter forced move UI (earth receiving intermediate state)
+    if (this.isMultiplayer && this.state.pendingForcedMove?.player === this.state.localPlayer) {
+      this.enterForcedMoveUI();
+      return;
+    }
 
     // Check if game is over
     if (this.state.winner) {
@@ -859,7 +875,9 @@ export class HexInteraction {
   // ==========================================
 
   private onHexClick(hexId: HexId) {
-    if (this.isMultiplayer && !this.isMyTurn) return;
+    // Allow forced move clicks even when it's not our turn
+    const isForcedMoveTarget = this.state.pendingForcedMove?.player === this.state.localPlayer;
+    if (this.isMultiplayer && !this.isMyTurn && !isForcedMoveTarget) return;
     if (!this.validTargets.includes(hexId)) return;
 
     console.log('[HexClick] hexId=%s, phase=%s, selectedAction=%s, validTargets=%d',
@@ -1495,14 +1513,46 @@ export class HexInteraction {
       return;
     }
 
+    // In multiplayer, if we're NOT the forced-move player, send state and wait
+    if (this.isMultiplayer && this.state.localPlayer !== fm.player) {
+      this.waitingForForcedMove = true;
+      this.postForcedMoveCallback = callback;
+      // Send intermediate state so the forced-move player sees it
+      // Include action animations so other players see the action that triggered this
+      const animations = this.turnAnimations.length > 0 ? [...this.turnAnimations] : undefined;
+      const actionLabel = this.lastActionLabel ?? undefined;
+      this.turnAnimations = [];
+      this.lastActionLabel = null;
+      if (this.network!.isHost) {
+        this.network!.broadcastState(this.state, animations, undefined, actionLabel);
+      } else {
+        this.network!.sendStateToHost(this.state, animations, actionLabel);
+      }
+      this.state.stepInstruction = `Waiting for ${NAMES[fm.player]} to move...`;
+      this.board.render(this.state);
+      this.topBar.render(this.state);
+      this.dialog.showInfo('Forced Move', `Waiting for ${NAMES[fm.player]} to choose where to move...`);
+      return;
+    }
+
+    // We ARE the forced-move player (or local game) — show forced move UI
     this.postForcedMoveCallback = callback;
+    this.enterForcedMoveUI();
+  }
+
+  /** Show the forced move UI: highlight valid targets and prompt the player */
+  private enterForcedMoveUI() {
+    const fm = this.state.pendingForcedMove!;
     this.validTargets = fm.validTargets;
-    this.state.stepInstruction = 'Choose a hex for Kaijom';
+    this.state.stepInstruction = `Choose a hex for ${NAMES[fm.player]}`;
     this.state.phase = 'EXECUTING';
     this.board.render(this.state);
-    this.board.highlightValidTargets(fm.validTargets, 'earth');
+    this.board.highlightValidTargets(fm.validTargets, fm.player);
     this.topBar.render(this.state);
-    this.dialog.showInfo('Forced Move!', 'Fire was placed on Kaijom\'s hex. Earth must move!');
+    const msg = this.isMultiplayer
+      ? `Fire was placed on ${NAMES[fm.player]}'s hex. You must move!`
+      : `Fire was placed on ${NAMES[fm.player]}'s hex. ${NAMES[fm.player]} must move!`;
+    this.dialog.showInfo('Forced Move!', msg);
   }
 
   private handleForcedMoveClick(hexId: HexId) {
@@ -1512,11 +1562,67 @@ export class HexInteraction {
     if (this.checkWin()) return;
     this.board.render(this.state);
     this.playPendingAnimation().then(() => {
+      if (this.postForcedMoveCallback) {
+        // Local game or we ARE the active turn player: call continuation callback
+        const cb = this.postForcedMoveCallback;
+        this.postForcedMoveCallback = null;
+        cb();
+      } else if (this.network) {
+        // Multiplayer: we're the forced-move player (earth), not the active turn player
+        // Send our choice and wait for the active player to continue
+        this.network.sendForcedMoveChoice(hexId);
+        this.showWaitingForActivePlayer();
+      }
+    }).catch(err => {
+      console.error('[ForcedMove] Animation error:', err);
+      if (this.postForcedMoveCallback) {
+        const cb = this.postForcedMoveCallback;
+        this.postForcedMoveCallback = null;
+        cb();
+      } else if (this.network) {
+        this.network.sendForcedMoveChoice(hexId);
+        this.showWaitingForActivePlayer();
+      }
+    });
+  }
+
+  /** After earth completes forced move in multiplayer, show waiting state */
+  private showWaitingForActivePlayer() {
+    this.validTargets = [];
+    this.state.stepInstruction = '';
+    this.board.render(this.state);
+    this.board.clearHighlights();
+    const waitingName = NAMES[this.state.currentPlayer];
+    this.dialog.showInfo(`Waiting for ${waitingName}...`, `${waitingName} is continuing their turn.`);
+  }
+
+  /** Active turn player receives earth's forced move choice from network */
+  private resolveForcedMoveFromNetwork(hexId: HexId) {
+    if (!this.waitingForForcedMove) return;
+    this.waitingForForcedMove = false;
+    this.dialog.hide();
+
+    const earth = this.state.getPlayer('earth');
+    const fromHex = earth.hexId;
+    this.executor.executeForcedMove(hexId);
+    if (this.checkWin()) return;
+    this.board.render(this.state);
+
+    // Animate earth moving (local display only, not added to turnAnimations)
+    this.animateWithTabSafety(this.board.animateStandee('earth', [fromHex, hexId])).then(() => {
+      // Sync spectators with post-forced-move state
+      if (this.network) {
+        if (this.network.isHost) {
+          this.network.broadcastState(this.state);
+        } else {
+          this.network.sendStateToHost(this.state);
+        }
+      }
       const cb = this.postForcedMoveCallback;
       this.postForcedMoveCallback = null;
       if (cb) cb();
     }).catch(err => {
-      console.error('[ForcedMove] Animation error:', err);
+      console.error('[ForcedMove] Remote resolve animation error:', err);
       const cb = this.postForcedMoveCallback;
       this.postForcedMoveCallback = null;
       if (cb) cb();

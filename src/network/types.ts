@@ -49,7 +49,8 @@ export type NetworkMessage =
   | { type: 'rematch-start'; state: any; playerAssignments: Record<string, ElementalType> }
   | { type: 'return-to-lobby' }
   | { type: 'error'; message: string }
-  | { type: 'player-disconnected'; playerId: string };
+  | { type: 'player-disconnected'; playerId: string }
+  | { type: 'forced-move-choice'; hexId: HexId };
 
 export type SignalingMessage =
   | { type: 'create-room' }
