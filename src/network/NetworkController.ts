@@ -27,6 +27,9 @@ export class NetworkController {
   private onErrorCallback: ((msg: string) => void) | null = null;
   private onPeerConnectedCallback: ((peerId: string) => void) | null = null;
   private onPeerDisconnectedCallback: ((peerId: string) => void) | null = null;
+  private onReturnToLobbyCallback: (() => void) | null = null;
+  private onRematchRequestCallback: ((playerId: string) => void) | null = null;
+  private onRematchStartCallback: ((state: any, playerAssignments: Record<string, ElementalType>) => void) | null = null;
 
   constructor(serverUrl: string, role: NetworkRole) {
     this.signaling = new SignalingClient(serverUrl);
@@ -58,6 +61,9 @@ export class NetworkController {
   onError(cb: (msg: string) => void) { this.onErrorCallback = cb; }
   onPeerConnected(cb: (peerId: string) => void) { this.onPeerConnectedCallback = cb; }
   onPeerDisconnected(cb: (peerId: string) => void) { this.onPeerDisconnectedCallback = cb; }
+  onReturnToLobby(cb: () => void) { this.onReturnToLobbyCallback = cb; }
+  onRematchRequest(cb: (playerId: string) => void) { this.onRematchRequestCallback = cb; }
+  onRematchStart(cb: (state: any, playerAssignments: Record<string, ElementalType>) => void) { this.onRematchStartCallback = cb; }
 
   // --- Connection ---
 
@@ -117,6 +123,32 @@ export class NetworkController {
     if (this.isHost) return;
     const msg: NetworkMessage = { type: 'state-update', data: GameState.toJSON(state), animations };
     this.sendToAllPeers(msg);
+  }
+
+  /** Request a rematch — sends to all peers */
+  requestRematch() {
+    const msg: NetworkMessage = { type: 'rematch-request', playerId: this.localId };
+    this.sendToAllPeers(msg);
+  }
+
+  /** Host broadcasts rematch start with new game state */
+  startRematch(state: GameState, assignments: Record<string, ElementalType>) {
+    if (!this.isHost) return;
+    this.gameStarted = true;
+    const stateData = GameState.toJSON(state);
+    const msg: NetworkMessage = { type: 'rematch-start', state: stateData, playerAssignments: assignments };
+    this.sendToAllPeers(msg);
+  }
+
+  /** Return all players to lobby (via signaling — server resets and broadcasts) */
+  returnToLobby() {
+    this.gameStarted = false;
+    this.signaling.returnToLobby();
+  }
+
+  /** Reset gameStarted flag (for rematch) */
+  resetForNewGame() {
+    this.gameStarted = false;
   }
 
   /** Send a message to all peers, falling back to signaling relay if WebRTC isn't open */
@@ -213,6 +245,21 @@ export class NetworkController {
         }
         break;
 
+      case 'return-to-lobby':
+        this.gameStarted = false;
+        // Rebuild lobby state from server's player list
+        if (this.lobbyState) {
+          this.lobbyState.started = false;
+          this.lobbyState.players = msg.players.map(p => ({
+            id: p.id,
+            elemental: null,
+            ready: false,
+          }));
+          this.onLobbyUpdateCallback?.(this.lobbyState);
+        }
+        this.onReturnToLobbyCallback?.();
+        break;
+
       case 'error':
         this.onErrorCallback?.(msg.message);
         break;
@@ -274,6 +321,13 @@ export class NetworkController {
           const myElemental = msg.playerAssignments[this.localId];
           this.onGameStartCallback?.(msg.state, myElemental);
         }
+        break;
+      case 'rematch-request':
+        this.onRematchRequestCallback?.(msg.playerId);
+        break;
+      case 'rematch-start':
+        this.gameStarted = true;
+        this.onRematchStartCallback?.(msg.state, msg.playerAssignments);
         break;
     }
   }

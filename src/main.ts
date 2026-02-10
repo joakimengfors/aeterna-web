@@ -130,7 +130,12 @@ function init() {
     const topBar = new TopBar(topBarEl);
     const dialog = new GameDialog();
 
-    new HexInteraction(state, board, playerPanel, topBar, dialog, net);
+    const interaction = new HexInteraction(state, board, playerPanel, topBar, dialog, net);
+    interaction.onReturnToLobbyCallback = () => {
+      gameLayout.style.display = 'none';
+      menuEl.style.display = '';
+      menu.setScreen(net.isHost ? 'host-lobby' : 'join-lobby');
+    };
   }
 }
 

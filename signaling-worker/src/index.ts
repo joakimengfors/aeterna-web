@@ -219,6 +219,21 @@ export class GameRoom {
         }, fromId);
         break;
 
+      case 'return-to-lobby': {
+        // Reset room state so players can start a new game
+        this.started = false;
+        for (const p of this.players.values()) {
+          p.elemental = null;
+        }
+        const playerList = Array.from(this.players.values()).map(p => ({
+          id: p.id,
+          elemental: p.elemental,
+        }));
+        // Broadcast to ALL players (including sender)
+        this.broadcast({ type: 'return-to-lobby', players: playerList });
+        break;
+      }
+
       case 'relay': {
         // Forward game data to a specific player via signaling (WebRTC fallback)
         const relayTarget = this.players.get(msg.to);

@@ -73,6 +73,12 @@ export class HexInteraction {
   // Network
   private network: NetworkController | null = null;
 
+  // Rematch voting
+  private rematchVotes: Set<string> = new Set();
+
+  // Callback for returning to lobby (set from main.ts)
+  onReturnToLobbyCallback: (() => void) | null = null;
+
   constructor(
     state: GameState,
     board: BoardRenderer,
@@ -140,6 +146,24 @@ export class HexInteraction {
       // current game dialog (confirm, action choice, etc.) and breaks the flow.
       // The signaling relay fallback keeps the game working without WebRTC.
       console.warn('[Network] Peer disconnected:', _peerId, '(signaling relay active)');
+    });
+
+    this.network.onRematchRequest((playerId) => {
+      this.rematchVotes.add(playerId);
+      this.dialog.updateRematchStatus(this.rematchVotes.size, this.state.playerCount);
+      // If all players voted and we're host, start the rematch
+      if (this.rematchVotes.size >= this.state.playerCount && this.network!.isHost) {
+        this.startRematchAsHost();
+      }
+    });
+
+    this.network.onRematchStart((stateData, _playerAssignments) => {
+      this.applyRematchState(stateData);
+    });
+
+    this.network.onReturnToLobby(() => {
+      this.dialog.hide();
+      this.onReturnToLobbyCallback?.();
     });
   }
 
@@ -259,7 +283,7 @@ export class HexInteraction {
       this.dialog.showVictory(this.state, {
         onRematch: () => this.rematch(),
         onReturnToMenu: () => this.returnToMenu(),
-        onReturnToLobby: this.network ? () => this.returnToMenu() : undefined,
+        onReturnToLobby: this.network ? () => this.returnToLobby() : undefined,
       });
       return;
     }
@@ -1694,7 +1718,7 @@ export class HexInteraction {
       this.dialog.showVictory(this.state, {
         onRematch: () => this.rematch(),
         onReturnToMenu: () => this.returnToMenu(),
-        onReturnToLobby: this.network ? () => this.returnToMenu() : undefined,
+        onReturnToLobby: this.network ? () => this.returnToLobby() : undefined,
       });
       return true;
     }
@@ -1710,7 +1734,7 @@ export class HexInteraction {
       this.dialog.showVictory(this.state, {
         onRematch: () => this.rematch(),
         onReturnToMenu: () => this.returnToMenu(),
-        onReturnToLobby: this.network ? () => this.returnToMenu() : undefined,
+        onReturnToLobby: this.network ? () => this.returnToLobby() : undefined,
       });
       return true;
     }
@@ -1718,10 +1742,47 @@ export class HexInteraction {
   }
 
   private rematch() {
-    const playerCount = this.state.playerCount;
-    const localPlayer = this.state.localPlayer;
-    this.state = new GameState(playerCount);
-    if (localPlayer) this.state.localPlayer = localPlayer;
+    if (this.network) {
+      // Multiplayer: send rematch request and wait for all players
+      this.rematchVotes.add(this.network.playerId);
+      this.network.requestRematch();
+      this.dialog.updateRematchStatus(this.rematchVotes.size, this.state.playerCount);
+      // If all players voted and we're host, start the rematch
+      if (this.rematchVotes.size >= this.state.playerCount && this.network.isHost) {
+        this.startRematchAsHost();
+      }
+      return;
+    }
+    // Local: reset immediately
+    this.resetGameState(new GameState(this.state.playerCount));
+  }
+
+  /** Host creates new state and broadcasts rematch-start to all peers */
+  private startRematchAsHost() {
+    if (!this.network) return;
+    const lobby = this.network.lobby;
+    if (!lobby) return;
+    const assignments: Record<string, ElementalType> = {};
+    for (const p of lobby.players) {
+      if (p.elemental) assignments[p.id] = p.elemental;
+    }
+    const newState = new GameState(this.state.playerCount);
+    newState.localPlayer = this.state.localPlayer;
+    this.network.resetForNewGame();
+    this.network.startRematch(newState, assignments);
+    this.applyRematchState(GameState.toJSON(newState));
+  }
+
+  /** Apply rematch state (used by both host and guests) */
+  private applyRematchState(stateData: any) {
+    const newState = GameState.fromJSON(stateData);
+    newState.localPlayer = this.state.localPlayer;
+    this.resetGameState(newState);
+  }
+
+  /** Reset game to a fresh state */
+  private resetGameState(newState: GameState) {
+    this.state = newState;
     this.executor = new ActionExecutor(this.state);
     this.turnMgr = new TurnManager(this.state);
     this.selectedAction = null;
@@ -1730,8 +1791,16 @@ export class HexInteraction {
     this.savedState = null;
     this.validTargets = [];
     this.turnAnimations = [];
+    this.rematchVotes.clear();
     this.dialog.hide();
     this.showTurnBanner(() => this.renderAll());
+  }
+
+  private returnToLobby() {
+    if (!this.network) return;
+    this.network.returnToLobby();
+    // The onReturnToLobby callback in NetworkController will fire for all players
+    // (including us) via signaling broadcast, which triggers onReturnToLobbyCallback
   }
 
   private returnToMenu() {

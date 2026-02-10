@@ -45,6 +45,9 @@ export type NetworkMessage =
   | { type: 'state-update'; data: any; animations?: TurnAnimationData[] }
   | { type: 'lobby-update'; lobby: LobbyState }
   | { type: 'game-start'; state: any; playerAssignments: Record<string, ElementalType> }
+  | { type: 'rematch-request'; playerId: string }
+  | { type: 'rematch-start'; state: any; playerAssignments: Record<string, ElementalType> }
+  | { type: 'return-to-lobby' }
   | { type: 'error'; message: string }
   | { type: 'player-disconnected'; playerId: string };
 
@@ -58,6 +61,7 @@ export type SignalingMessage =
   | { type: 'pick-elemental'; elemental: ElementalType }
   | { type: 'elemental-picked'; playerId: string; elemental: ElementalType }
   | { type: 'start-game'; state?: any; playerAssignments?: Record<string, ElementalType> }
+  | { type: 'return-to-lobby'; players: { id: string; elemental: string | null }[] }
   | { type: 'relay'; from: string; data: any }
   | { type: 'error'; message: string }
   | { type: 'room-joined'; hostId: string; playerId: string; players: { id: string; elemental: ElementalType | null }[] };

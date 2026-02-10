@@ -82,6 +82,11 @@ export class SignalingClient {
     this.send({ type: 'relay', to: toId, data });
   }
 
+  /** Request return to lobby (resets server room state) */
+  returnToLobby() {
+    this.send({ type: 'return-to-lobby' });
+  }
+
   close() {
     this.stopKeepalive();
     if (this.ws) {

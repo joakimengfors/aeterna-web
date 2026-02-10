@@ -268,6 +268,8 @@ export class MainMenu {
     const playerCount = lobby ? lobby.players.length : 0;
     const localPlayer = lobby?.players.find(p => p.id === this.localPlayerId);
     const pickedElementals = new Set(lobby?.players.filter(p => p.elemental).map(p => p.elemental!) || []);
+    // Derive required player count: 4 if aeterna is picked or 4+ players present, else 3
+    const requiredPlayers = (pickedElementals.has('aeterna') || playerCount >= 4) ? 4 : 3;
 
     this.container.innerHTML = `
       <div class="menu-bg">
@@ -275,7 +277,7 @@ export class MainMenu {
           <h2 class="menu-subtitle">Lobby</h2>
 
           <div class="lobby-players">
-            <div class="lobby-players-label">Players (${playerCount}/3)</div>
+            <div class="lobby-players-label">Players (${playerCount}/${requiredPlayers})</div>
             ${lobby ? lobby.players.map((p, i) => `
               <div class="lobby-player-row">
                 <span class="lobby-player-name">${p.id === lobby.hostId ? 'Host' : 'Player ' + (i + 1)}</span>

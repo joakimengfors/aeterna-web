@@ -309,7 +309,6 @@ export class GameDialog {
     `;
 
     this.content.querySelector('[data-idx="rematch"]')!.addEventListener('click', () => {
-      this.hide();
       options.onRematch();
     });
     this.content.querySelector('[data-idx="lobby"]')?.addEventListener('click', () => {
@@ -325,6 +324,20 @@ export class GameDialog {
     this.overlay.style.pointerEvents = '';
     this.content.style.pointerEvents = '';
     this.show();
+  }
+
+  /** Update rematch button to show vote count and disable other buttons */
+  updateRematchStatus(currentVotes: number, totalPlayers: number) {
+    const rematchBtn = this.content.querySelector('[data-idx="rematch"]') as HTMLButtonElement | null;
+    if (rematchBtn) {
+      rematchBtn.textContent = `Rematch \u2713 (${currentVotes}/${totalPlayers})`;
+      rematchBtn.disabled = true;
+    }
+    // Disable other buttons once player has committed to rematch
+    const lobbyBtn = this.content.querySelector('[data-idx="lobby"]') as HTMLButtonElement | null;
+    const menuBtn = this.content.querySelector('[data-idx="menu"]') as HTMLButtonElement | null;
+    if (lobbyBtn) lobbyBtn.disabled = true;
+    if (menuBtn) menuBtn.disabled = true;
   }
 
   private getWinReason(state: GameState, winner: ElementalType): string {
