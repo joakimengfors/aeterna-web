@@ -73,7 +73,7 @@ function init() {
       }
     },
 
-    onPickElemental: (elemental: ElementalType) => {
+    onPickElemental: (elemental: ElementalType | null) => {
       network?.pickElemental(elemental);
     },
 

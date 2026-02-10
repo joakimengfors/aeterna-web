@@ -188,6 +188,17 @@ export class GameRoom {
         const player = this.players.get(fromId);
         if (!player) return;
 
+        // Allow deselecting by sending null
+        if (!msg.elemental) {
+          player.elemental = null;
+          this.broadcast({
+            type: 'elemental-picked',
+            playerId: fromId,
+            elemental: null,
+          });
+          break;
+        }
+
         const taken = new Set(
           Array.from(this.players.values())
             .filter(p => p.id !== fromId && p.elemental)

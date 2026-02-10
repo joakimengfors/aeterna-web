@@ -69,7 +69,7 @@ export class SignalingClient {
     this.send({ type: 'signal', to, from, data });
   }
 
-  pickElemental(elemental: ElementalType) {
+  pickElemental(elemental: ElementalType | null) {
     this.send({ type: 'pick-elemental', elemental });
   }
 

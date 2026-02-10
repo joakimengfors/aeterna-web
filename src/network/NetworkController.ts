@@ -77,7 +77,7 @@ export class NetworkController {
     await this.signaling.joinRoom(code);
   }
 
-  pickElemental(elemental: ElementalType) {
+  pickElemental(elemental: ElementalType | null) {
     this.signaling.pickElemental(elemental);
   }
 

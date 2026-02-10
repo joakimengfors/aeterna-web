@@ -25,7 +25,7 @@ export interface MainMenuCallbacks {
   onLocalPlay: (playerCount: number) => void;
   onHostGame: (playerCount: number) => void;
   onJoinGame: (code: string) => void;
-  onPickElemental: (elemental: ElementalType) => void;
+  onPickElemental: (elemental: ElementalType | null) => void;
   onStartGame: () => void;
   onBackToMenu: () => void;
 }
@@ -339,7 +339,12 @@ export class MainMenu {
       if (btn.hasAttribute('disabled')) return;
       btn.addEventListener('click', () => {
         const el = btn.getAttribute('data-elemental') as ElementalType;
-        this.callbacks.onPickElemental(el);
+        // Click selected elemental again to deselect
+        if (btn.classList.contains('selected')) {
+          this.callbacks.onPickElemental(null);
+        } else {
+          this.callbacks.onPickElemental(el);
+        }
       });
     });
   }

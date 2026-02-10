@@ -58,8 +58,8 @@ export type SignalingMessage =
   | { type: 'player-joined'; playerId: string; playerCount: number }
   | { type: 'player-left'; playerId: string }
   | { type: 'signal'; to: string; from: string; data: any }
-  | { type: 'pick-elemental'; elemental: ElementalType }
-  | { type: 'elemental-picked'; playerId: string; elemental: ElementalType }
+  | { type: 'pick-elemental'; elemental: ElementalType | null }
+  | { type: 'elemental-picked'; playerId: string; elemental: ElementalType | null }
   | { type: 'start-game'; state?: any; playerAssignments?: Record<string, ElementalType> }
   | { type: 'return-to-lobby'; players: { id: string; elemental: string | null }[] }
   | { type: 'relay'; from: string; data: any }
