@@ -71,6 +71,7 @@ export class HexInteraction {
   private remoteAnimGeneration = 0;
   // Action label for remote animation display (e.g. "Krakatoa used Firestorm")
   private lastActionLabel: string | null = null;
+  private actionLabelEl: HTMLElement | null = null;
 
   // Network
   private network: NetworkController | null = null;
@@ -225,16 +226,15 @@ export class HexInteraction {
     const gen = this.remoteAnimGeneration;
 
     // Show action label overlay during animations
-    let labelEl: HTMLElement | null = null;
     if (actionLabel) {
-      labelEl = this.showActionLabelOverlay(actionLabel, prevPlayer);
+      this.showActionLabelOverlay(actionLabel, prevPlayer);
     }
 
     for (const anim of animations) {
       // Check if invalidated by a newer state update
       if (this.remoteAnimGeneration !== gen) {
         console.log('[Remote] Animation sequence superseded (gen %d → %d)', gen, this.remoteAnimGeneration);
-        labelEl?.remove();
+        this.removeActionLabelOverlay(true);
         return;
       }
 
@@ -250,10 +250,7 @@ export class HexInteraction {
     }
 
     // Fade out and remove label
-    if (labelEl) {
-      labelEl.classList.add('fade-out');
-      setTimeout(() => labelEl?.remove(), 500);
-    }
+    this.removeActionLabelOverlay();
 
     // Final check before applying state
     if (this.remoteAnimGeneration !== gen) {
@@ -265,14 +262,26 @@ export class HexInteraction {
   }
 
   /** Show a floating action label overlay (e.g. "Krakatoa used Firestorm") */
-  private showActionLabelOverlay(label: string, player: ElementalType): HTMLElement {
-    // Remove any existing label
-    document.querySelector('.action-label-overlay')?.remove();
+  private showActionLabelOverlay(label: string, player: ElementalType) {
+    this.removeActionLabelOverlay(true);
     const el = document.createElement('div');
     el.className = `action-label-overlay theme-${player}`;
     el.textContent = label;
     document.body.appendChild(el);
-    return el;
+    this.actionLabelEl = el;
+  }
+
+  /** Fade out and remove the action label overlay */
+  private removeActionLabelOverlay(immediate = false) {
+    if (!this.actionLabelEl) return;
+    const el = this.actionLabelEl;
+    this.actionLabelEl = null;
+    if (immediate) {
+      el.remove();
+    } else {
+      el.classList.add('fade-out');
+      setTimeout(() => el.remove(), 500);
+    }
   }
 
   /** Apply a deserialized remote state and trigger appropriate UI updates */
@@ -1499,6 +1508,11 @@ export class HexInteraction {
   private onConfirm() {
     this.dialog.hide();
 
+    // Show action label overlay during the confirm animation
+    if (this.lastActionLabel && this.selectedAction) {
+      this.showActionLabelOverlay(this.lastActionLabel, this.state.currentPlayer);
+    }
+
     if (this.state.phase === 'CONFIRM' && this.selectedAction) {
       // Flame Dash special handling
       if (this.selectedAction === 'flame-dash') {
@@ -1641,6 +1655,7 @@ export class HexInteraction {
   }
 
   private showTurnBanner(callback: () => void) {
+    this.removeActionLabelOverlay();
     const name = NAMES[this.state.currentPlayer];
     // Apply theme immediately so banner picks up correct colors
     const layout = document.querySelector('.game-layout');
@@ -1660,6 +1675,7 @@ export class HexInteraction {
     this.dialog.hide();
     this.turnAnimations = [];
     this.lastActionLabel = null;
+    this.removeActionLabelOverlay(true);
 
     const wasSOT = !this.selectedAction && this.state.phase === 'EXECUTING';
 
@@ -1750,6 +1766,7 @@ export class HexInteraction {
     const wp = this.state.getElementalPower('water');
     const fp = this.state.getElementalPower('fire');
     if (ep === wp && wp === fp) {
+      this.removeActionLabelOverlay();
       this.state.winner = 'aeterna';
       this.syncState();
       this.board.render(this.state);
@@ -1766,6 +1783,7 @@ export class HexInteraction {
   private checkWin(): boolean {
     const winner = checkWinConditions(this.state);
     if (winner) {
+      this.removeActionLabelOverlay();
       this.state.winner = winner;
       this.syncState();
       this.board.render(this.state);
