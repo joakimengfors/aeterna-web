@@ -35,10 +35,14 @@ export interface LobbyState {
   started: boolean;
 }
 
+export type TurnAnimationData =
+  | { kind: 'standee'; entityType: ElementalType | 'minion'; path: HexId[] }
+  | { kind: 'token'; tokenType: string; from: HexId; to: HexId };
+
 export type NetworkMessage =
   | { type: 'full-state'; data: any }
   | { type: 'action'; intent: ActionIntent }
-  | { type: 'state-update'; data: any }
+  | { type: 'state-update'; data: any; animations?: TurnAnimationData[] }
   | { type: 'lobby-update'; lobby: LobbyState }
   | { type: 'game-start'; state: any; playerAssignments: Record<string, ElementalType> }
   | { type: 'error'; message: string }

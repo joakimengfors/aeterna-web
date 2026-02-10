@@ -46,5 +46,7 @@ bun run preview
 - `isMyTurn` guard in `applyRemoteState` prevents stale/duplicate remote updates from overwriting the active player's in-progress turn
 - Network disconnect events use `console.warn` instead of modal dialogs to avoid overwriting active game dialogs
 - Phase transitions (e.g. SOT skip → CHOOSE_ACTION) clean up all interaction state to prevent stale targets from interfering
+- **Remote animation sync**: Turn animations (standee moves, fog token moves) are collected in `turnAnimations[]` during a turn, sent alongside state updates, and replayed on remote players' boards before applying the new state
+- **Background tab safety**: `requestAnimationFrame` is paused in hidden tabs, which would block animation promises and prevent `finishTurn()`/`syncState()`. Three safeguards: (1) `BoardRenderer.animateStandee/animateTokenMove` skip immediately if `document.hidden`, (2) `animateWithTabSafety()` races animation promises against `visibilitychange` to unblock mid-animation tab switches, (3) `visibilitychange` listener refreshes board/panel/topbar (but NOT dialogs) when tab becomes visible
 - Deploy signaling: `cd signaling-worker && bun install && bun x wrangler deploy`
 - Override signaling URL: `?server=wss://your-worker.workers.dev`

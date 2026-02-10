@@ -15,6 +15,7 @@ import type { ActionId, HexId, ElementalType } from '../game/types';
 import { getActionsForElemental } from '../game/types';
 import { getNeighbors, getLineHexes, isShore, ALL_HEX_IDS, getShortestPath, getPixelPos } from '../game/HexGrid';
 import type { NetworkController } from '../network/NetworkController';
+import type { TurnAnimationData } from '../network/types';
 
 const NAMES: Record<ElementalType, string> = { earth: 'Kaijom', water: 'Nitsuji', fire: 'Krakatoa', aeterna: 'Aeterna' };
 
@@ -64,6 +65,11 @@ export class HexInteraction {
   // Animation: pending move animation to play after render
   private pendingAnimation: { type: ElementalType | 'minion'; path: HexId[] } | null = null;
 
+  // Collected animations for this turn (sent to remote players)
+  private turnAnimations: TurnAnimationData[] = [];
+  // Generation counter: incremented on each applyRemoteState to invalidate stale animations
+  private remoteAnimGeneration = 0;
+
   // Network
   private network: NetworkController | null = null;
 
@@ -90,6 +96,17 @@ export class HexInteraction {
 
     this.board.setHexClickHandler((hexId) => this.onHexClick(hexId));
     this.topBar.onMenuClick(() => this.returnToMenu());
+
+    // Re-render board when tab becomes visible (animations may have been skipped while hidden)
+    // Only refresh board visuals — don't call renderAll() which hides dialogs
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        this.board.render(this.state);
+        this.playerPanel.render(this.state);
+        this.topBar.render(this.state);
+      }
+    });
+
     this.showTurnBanner(() => this.renderAll());
   }
 
@@ -106,14 +123,15 @@ export class HexInteraction {
     if (!this.network) return;
 
     // Both host and guest receive state updates
-    this.network.onRemoteState((data) => {
+    this.network.onRemoteState((data, animations) => {
       if (this.network!.isHost) {
         // Host received state from a guest who finished their turn — validate & rebroadcast
-        this.applyRemoteState(data);
-        this.network!.broadcastState(this.state);
+        this.applyRemoteState(data, animations);
+        // Re-broadcast with animations so other guests see them too
+        this.network!.broadcastState(this.state, animations);
       } else {
         // Guest received authoritative state from host
-        this.applyRemoteState(data);
+        this.applyRemoteState(data, animations);
       }
     });
 
@@ -128,14 +146,16 @@ export class HexInteraction {
   /** Send state to the network after a turn ends or game ends */
   private syncState() {
     if (!this.network) return;
+    const animations = this.turnAnimations.length > 0 ? [...this.turnAnimations] : undefined;
+    this.turnAnimations = [];
     if (this.network.isHost) {
-      this.network.broadcastState(this.state);
+      this.network.broadcastState(this.state, animations);
     } else {
-      this.network.sendStateToHost(this.state);
+      this.network.sendStateToHost(this.state, animations);
     }
   }
 
-  private applyRemoteState(stateData: any) {
+  private applyRemoteState(stateData: any, animations?: TurnAnimationData[]) {
     // During our own turn, we are the authority — ignore remote state updates.
     // This prevents stale/duplicate updates from resetting our in-progress turn.
     // The check uses the CURRENT (pre-update) state, so the initial transition
@@ -144,13 +164,65 @@ export class HexInteraction {
       console.log('[Remote] Ignoring state update during our turn (phase=%s)', this.state.phase);
       return;
     }
+
+    // Increment generation to invalidate any in-progress remote animations
+    this.remoteAnimGeneration++;
+
     console.log('[Remote] Applying remote state, current phase=%s, currentPlayer=%s', this.state.phase, this.state.currentPlayer);
 
     const newState = GameState.fromJSON(stateData);
     newState.localPlayer = this.state.localPlayer;
-
     const prevPlayer = this.state.currentPlayer;
 
+    // Skip animations if tab is hidden (background tabs throttle/pause animations,
+    // causing them to queue up and replay all at once when the tab becomes visible)
+    const shouldAnimate = animations && animations.length > 0 && !document.hidden;
+
+    if (shouldAnimate) {
+      // Play animations on the OLD DOM state, then apply new state after
+      this.playRemoteAnimations(animations, newState, prevPlayer);
+    } else {
+      this.applyNewState(newState, prevPlayer);
+    }
+  }
+
+  /** Play animations from a remote player's turn, then apply the new state */
+  private async playRemoteAnimations(
+    animations: TurnAnimationData[],
+    newState: GameState,
+    prevPlayer: ElementalType,
+  ) {
+    const gen = this.remoteAnimGeneration;
+
+    for (const anim of animations) {
+      // Check if invalidated by a newer state update
+      if (this.remoteAnimGeneration !== gen) {
+        console.log('[Remote] Animation sequence superseded (gen %d → %d)', gen, this.remoteAnimGeneration);
+        return;
+      }
+
+      try {
+        if (anim.kind === 'standee') {
+          await this.animateWithTabSafety(this.board.animateStandee(anim.entityType, anim.path));
+        } else if (anim.kind === 'token') {
+          await this.animateWithTabSafety(this.board.animateTokenMove(anim.tokenType, anim.from, anim.to));
+        }
+      } catch (err) {
+        console.error('[Remote] Animation error:', err);
+      }
+    }
+
+    // Final check before applying state
+    if (this.remoteAnimGeneration !== gen) {
+      console.log('[Remote] Animation sequence completed but was superseded');
+      return;
+    }
+
+    this.applyNewState(newState, prevPlayer);
+  }
+
+  /** Apply a deserialized remote state and trigger appropriate UI updates */
+  private applyNewState(newState: GameState, prevPlayer: ElementalType) {
     // Replace state fields
     this.state.board = newState.board;
     this.state.players = newState.players;
@@ -252,6 +324,11 @@ export class HexInteraction {
     }
 
     this.pendingAnimation = { type, path };
+
+    // Collect for remote playback
+    if (this.isMultiplayer) {
+      this.turnAnimations.push({ kind: 'standee', entityType: type, path: [...path] });
+    }
   }
 
   /** Queue animation based on action type and targets */
@@ -287,12 +364,33 @@ export class HexInteraction {
     }
   }
 
+  /**
+   * Race an animation promise against the tab becoming hidden.
+   * If the user switches tabs mid-animation, resolves immediately so game flow isn't blocked.
+   */
+  private animateWithTabSafety(animPromise: Promise<void>): Promise<void> {
+    if (document.hidden) return Promise.resolve();
+    return new Promise<void>(resolve => {
+      let done = false;
+      const finish = () => { if (!done) { done = true; resolve(); } };
+      animPromise.then(finish, finish);
+      const onVisChange = () => {
+        if (document.hidden) {
+          document.removeEventListener('visibilitychange', onVisChange);
+          finish();
+        }
+      };
+      document.addEventListener('visibilitychange', onVisChange);
+      animPromise.finally(() => document.removeEventListener('visibilitychange', onVisChange));
+    });
+  }
+
   /** Play any pending animation. Returns a promise that resolves when done. */
   private async playPendingAnimation(): Promise<void> {
     if (!this.pendingAnimation) return;
     const { type, path } = this.pendingAnimation;
     this.pendingAnimation = null;
-    await this.board.animateStandee(type, path);
+    await this.animateWithTabSafety(this.board.animateStandee(type, path));
   }
 
   private renderAll() {
@@ -1276,8 +1374,12 @@ export class HexInteraction {
     const fogHex = this.pendingFogMoves.shift()!;
 
     if (fogHex !== hexId) {
+      // Collect for remote playback
+      if (this.isMultiplayer) {
+        this.turnAnimations.push({ kind: 'token', tokenType: 'fog', from: fogHex, to: hexId });
+      }
       // Animate fog token before updating state
-      this.board.animateTokenMove('fog', fogHex, hexId).then(() => {
+      this.animateWithTabSafety(this.board.animateTokenMove('fog', fogHex, hexId)).then(() => {
         this.executor.moveFog(fogHex, hexId);
         if (this.checkWin()) return;
         this.renderAll();
@@ -1495,6 +1597,7 @@ export class HexInteraction {
 
   private onUndo() {
     this.dialog.hide();
+    this.turnAnimations = [];
 
     const wasSOT = !this.selectedAction && this.state.phase === 'EXECUTING';
 
@@ -1626,6 +1729,7 @@ export class HexInteraction {
     this.currentStep = 0;
     this.savedState = null;
     this.validTargets = [];
+    this.turnAnimations = [];
     this.dialog.hide();
     this.showTurnBanner(() => this.renderAll());
   }

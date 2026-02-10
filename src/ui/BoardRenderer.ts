@@ -403,6 +403,8 @@ export class BoardRenderer {
    */
   animateStandee(type: ElementalType | 'minion', path: HexId[]): Promise<void> {
     if (path.length === 0) return Promise.resolve();
+    // Skip animation when tab is hidden (rAF is paused, would block game flow)
+    if (document.hidden) return Promise.resolve();
 
     // Use Three.js animation for 3D models
     if (type === 'minion' && this.threeOverlay?.hasModel('stone_minion')) {
@@ -457,6 +459,8 @@ export class BoardRenderer {
    * Returns a promise that resolves when done. Falls back to instant if no 3D model.
    */
   animateTokenMove(type: string, fromHex: HexId, toHex: HexId): Promise<void> {
+    // Skip animation when tab is hidden (rAF is paused, would block game flow)
+    if (document.hidden) return Promise.resolve();
     if (this.threeOverlay?.hasTokenModel(type)) {
       return this.threeOverlay.animateTokenMove(type, fromHex, toHex);
     }
