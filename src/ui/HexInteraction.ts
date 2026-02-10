@@ -265,9 +265,21 @@ export class HexInteraction {
   /** Show a floating action label overlay (e.g. "Krakatoa used Firestorm") */
   private showActionLabelOverlay(label: string, player: ElementalType) {
     this.removeActionLabelOverlay(true);
+    // Parse "Name used Action" into structured parts
+    const match = label.match(/^(.+?) used (.+)$/);
     const el = document.createElement('div');
     el.className = `action-label-overlay theme-${player}`;
-    el.textContent = label;
+    if (match) {
+      el.innerHTML = `
+        <span class="action-label-line"></span>
+        <div class="action-label-content">
+          <span class="action-label-name">${match[1]}</span>
+          <span class="action-label-action">${match[2]}</span>
+        </div>
+        <span class="action-label-line"></span>`;
+    } else {
+      el.textContent = label;
+    }
     document.body.appendChild(el);
     this.actionLabelEl = el;
     this.actionLabelShownAt = Date.now();

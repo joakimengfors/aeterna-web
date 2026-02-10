@@ -1263,42 +1263,94 @@
             100% { transform: scale(1.1); }
         }
 
-        /* Action label overlay (shown during remote animations) */
+        /* Action label overlay (shown during animations) */
         .action-label-overlay {
             position: fixed;
-            top: 18%;
+            top: 16%;
             left: 50%;
             transform: translateX(-50%);
             z-index: 100;
             pointer-events: none;
+            display: flex;
+            align-items: center;
+            gap: 0;
+            animation: action-label-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        .action-label-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 12px 40px 14px;
+            background: linear-gradient(180deg, rgba(8,10,20,0.88) 0%, rgba(12,14,28,0.82) 100%);
+            border-top: 1px solid var(--el-primary);
+            border-bottom: 1px solid var(--el-primary);
+            box-shadow:
+                0 0 40px rgba(0,0,0,0.6),
+                0 0 20px var(--el-glow),
+                inset 0 1px 0 rgba(255,255,255,0.04),
+                inset 0 -1px 0 rgba(255,255,255,0.02);
+            position: relative;
+        }
+        .action-label-content::before,
+        .action-label-content::after {
+            content: '';
+            position: absolute;
+            left: 16px;
+            right: 16px;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--el-primary), transparent);
+            opacity: 0.3;
+        }
+        .action-label-content::before { top: 4px; }
+        .action-label-content::after { bottom: 4px; }
+        .action-label-name {
             font-family: var(--font-display);
-            font-size: clamp(18px, 2.5vw, 32px);
-            font-weight: 700;
+            font-size: clamp(10px, 1.2vw, 13px);
+            font-weight: 600;
+            color: var(--el-secondary);
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            opacity: 0.7;
+        }
+        .action-label-action {
+            font-family: var(--font-display);
+            font-size: clamp(22px, 3vw, 38px);
+            font-weight: 800;
             color: var(--el-primary);
             text-transform: uppercase;
-            letter-spacing: 3px;
-            white-space: nowrap;
+            letter-spacing: 4px;
+            line-height: 1.1;
             text-shadow:
                 0 0 20px var(--el-glow),
-                0 0 40px var(--el-glow),
+                0 0 50px var(--el-glow),
                 0 2px 4px rgba(0,0,0,0.9);
-            padding: 10px 36px;
-            background: linear-gradient(180deg, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.55) 100%);
-            border-top: 2px solid var(--el-primary);
-            border-bottom: 2px solid var(--el-primary);
-            box-shadow: 0 0 30px rgba(0,0,0,0.5), 0 0 15px var(--el-glow);
-            animation: action-label-in 0.4s ease forwards;
+            animation: action-label-glow 2s ease-in-out infinite alternate;
+        }
+        .action-label-line {
+            display: block;
+            width: clamp(40px, 8vw, 100px);
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--el-primary));
+            opacity: 0.5;
+            flex-shrink: 0;
+        }
+        .action-label-line:last-child {
+            background: linear-gradient(90deg, var(--el-primary), transparent);
         }
         .action-label-overlay.fade-out {
             animation: action-label-out 0.5s ease forwards;
         }
         @keyframes action-label-in {
-            0% { opacity: 0; transform: translateX(-50%) scale(0.85); }
-            100% { opacity: 1; transform: translateX(-50%) scale(1); }
+            0% { opacity: 0; transform: translateX(-50%) translateY(8px); }
+            100% { opacity: 1; transform: translateX(-50%) translateY(0); }
         }
         @keyframes action-label-out {
-            0% { opacity: 1; transform: translateX(-50%) scale(1); }
-            100% { opacity: 0; transform: translateX(-50%) scale(1.05); }
+            0% { opacity: 1; transform: translateX(-50%) translateY(0); }
+            100% { opacity: 0; transform: translateX(-50%) translateY(-8px); }
+        }
+        @keyframes action-label-glow {
+            0% { text-shadow: 0 0 15px var(--el-glow), 0 0 40px var(--el-glow), 0 2px 4px rgba(0,0,0,0.9); }
+            100% { text-shadow: 0 0 25px var(--el-glow), 0 0 60px var(--el-glow), 0 0 80px var(--el-glow), 0 2px 4px rgba(0,0,0,0.9); }
         }
 
         /* Corner frames */
