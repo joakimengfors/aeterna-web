@@ -129,12 +129,13 @@ export class HexInteraction {
     if (!this.network) return;
 
     // Both host and guest receive state updates
-    this.network.onRemoteState((data, animations) => {
+    this.network.onRemoteState((data, animations, fromId) => {
       if (this.network!.isHost) {
         // Host received state from a guest who finished their turn — validate & rebroadcast
         this.applyRemoteState(data, animations);
         // Re-broadcast with animations so other guests see them too
-        this.network!.broadcastState(this.state, animations);
+        // Exclude the sender — they already played the animations locally
+        this.network!.broadcastState(this.state, animations, fromId);
       } else {
         // Guest received authoritative state from host
         this.applyRemoteState(data, animations);
