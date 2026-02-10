@@ -40,14 +40,6 @@ export class TopBar {
           </div>
         </div>
       `;
-      this.container.querySelector('#fullscreen-btn')?.addEventListener('click', () => {
-        if (!document.fullscreenElement) {
-          document.documentElement.requestFullscreen();
-        } else {
-          document.exitFullscreen();
-        }
-      });
-      this.container.querySelector('#menu-btn')?.addEventListener('click', () => this.menuCallback?.());
     } else {
       this.container.innerHTML = `
         <div class="top-bar">
@@ -65,14 +57,20 @@ export class TopBar {
           </div>
         </div>
       `;
-      this.container.querySelector('#fullscreen-btn')?.addEventListener('click', () => {
-        if (!document.fullscreenElement) {
-          document.documentElement.requestFullscreen();
-        } else {
-          document.exitFullscreen();
-        }
-      });
-      this.container.querySelector('#menu-btn')?.addEventListener('click', () => this.menuCallback?.());
     }
+
+    this.container.querySelector('#fullscreen-btn')?.addEventListener('click', () => {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen();
+      } else {
+        document.exitFullscreen();
+      }
+    });
+
+    this.container.querySelector('#menu-btn')?.addEventListener('click', () => {
+      if (confirm('Return to menu? Current game progress will be lost.')) {
+        this.menuCallback?.();
+      }
+    });
   }
 }
