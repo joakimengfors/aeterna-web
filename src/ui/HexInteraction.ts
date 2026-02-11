@@ -1214,6 +1214,7 @@ export class HexInteraction {
     this.state.stepInstruction = instruction;
     this.board.render(this.state);
     this.board.highlightValidTargets(nextTargets, this.state.currentPlayer);
+    this.playerPanel.render(this.state);
     this.topBar.render(this.state);
     this.dialog.showInfoWithSkip('Firestorm', instruction, () => {
       this.dialog.hide();
@@ -1229,6 +1230,7 @@ export class HexInteraction {
     this.validTargets = moveTargets;
     this.board.render(this.state);
     this.board.highlightValidTargets(moveTargets, this.state.currentPlayer);
+    this.playerPanel.render(this.state);
     this.topBar.render(this.state);
     this.dialog.showInfo('Firestorm', instruction, () => this.onUndo());
   }
@@ -1701,6 +1703,37 @@ export class HexInteraction {
           console.error('[SwapPlaces] Animation error:', err);
           this.finishTurn();
         });
+        return;
+      }
+
+      // Special card movement (move-2-ignore, move-3-line, teleport-shore)
+      // The elemental was already moved in handleSpecialStep; apply landing effects
+      if (this.selectedAction === 'special') {
+        const targetHex = this.actionTargets[this.actionTargets.length - 1];
+        const currentPlayer = this.state.currentPlayer;
+
+        // Apply movement landing effects
+        if (currentPlayer === 'earth') {
+          this.executor.handleEarthConversion(targetHex);
+        }
+
+        this.state.addLog(this.lastActionLabel || 'Used special ability');
+        this.turnMgr.setActionMarker('special');
+        this.activeSpecialCardId = null;
+
+        if (this.checkWin()) return;
+        this.board.render(this.state);
+
+        // If water moved, offer fog movement
+        if (currentPlayer === 'water') {
+          const fogHexes = this.executor.getFogTokenHexes();
+          if (fogHexes.length > 0) {
+            this.startFogMovePhase(1, () => this.finishTurn());
+            return;
+          }
+        }
+
+        this.finishTurn();
         return;
       }
 

@@ -176,10 +176,13 @@ export class PlayerPanel {
     for (const [token, count] of Object.entries(supplies)) {
       const max = this.getMaxSupply(token);
       const onBoard = max - count;
+      const bonusTag = type === 'fire' && token === 'fire' && count <= 4
+        ? ' <span class="bonus-movement">Bonus movement!</span>'
+        : '';
       chips.push(`
         <div class="token-chip">
           <span class="token-dot ${token}"></span>
-          ${onBoard} / ${max} ${token.charAt(0).toUpperCase() + token.slice(1)}
+          ${onBoard} / ${max} ${token.charAt(0).toUpperCase() + token.slice(1)}${bonusTag}
         </div>
       `);
     }
