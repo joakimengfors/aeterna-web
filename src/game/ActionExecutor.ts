@@ -518,14 +518,14 @@ export class ActionExecutor {
     const range = 2 + bonus;
     const targets: HexId[] = [];
 
-    // Straight line movement, ignoring terrain
+    // Straight line movement, ignoring terrain (but fog stops movement)
     const lines = getLineHexes(fire.hexId, range);
     for (const { hexes } of lines) {
       for (let i = 0; i < hexes.length; i++) {
         const h = hexes[i];
-        // Can end here if valid destination
         if (this.canFireEnd(h)) targets.push(h);
-        // Smoke Dash ignores terrain for passing through
+        // Fog stops movement even though Smoke Dash ignores other terrain
+        if (this.state.hasToken(h, 'fog')) break;
       }
     }
 
@@ -553,9 +553,9 @@ export class ActionExecutor {
       for (let i = 0; i < hexes.length; i++) {
         const h = hexes[i];
         if (this.canFireEnd(h)) targets.push(h);
-        // Stop if blocked by mountain or lake (can't pass through)
+        // Stop if blocked by mountain, lake, or fog (can't pass through)
         const hex = this.state.getHex(h);
-        if (hex.tokens.includes('mountain') || hex.tokens.includes('lake')) break;
+        if (hex.tokens.includes('mountain') || hex.tokens.includes('lake') || hex.tokens.includes('fog')) break;
       }
     }
 
@@ -680,6 +680,8 @@ export class ActionExecutor {
 
     while (queue.length > 0) {
       const current = queue.shift()!;
+      // Fog stops movement — can enter a fog+fire hex but can't continue through it
+      if (current !== start && this.state.hasToken(current, 'fog')) continue;
       for (const n of getNeighbors(current)) {
         if (!connected.has(n) && this.state.hasToken(n, 'fire')) {
           connected.add(n);

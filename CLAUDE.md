@@ -52,3 +52,12 @@ bun run preview
 - **Return to Lobby**: Any player can click "Return to Lobby" after game ends. Sends `return-to-lobby` via signaling server, which resets `started` flag and elemental picks, then broadcasts to all players. All clients transition back to the lobby screen with network connections preserved.
 - Deploy signaling: `cd signaling-worker && bun install && bun x wrangler deploy`
 - Override signaling URL: `?server=wss://your-worker.workers.dev`
+
+## Game mechanics
+
+- **Fog stops movement**: Entering a fog hex ends movement immediately. An elemental can move INTO a fog hex but cannot continue past it. This applies universally: earth movement (Uproot, Landslide), fire movement (Smoke Dash, Flame Dash, Firestorm), special card movement (Move 2, Move 3 in a Line), and animation pathfinding. `getConnectedFire` BFS also stops at fog — fire tokens beyond fog are unreachable.
+- **Fire movement bonus**: When fire's supply has 4 or fewer tokens remaining, fire gets +1 range on all movement actions (Smoke Dash, Flame Dash, Firestorm). The player panel shows "Bonus movement!" indicator when active. Note: firestorm places tokens before the movement phase, so placing tokens can reduce supply below the threshold mid-action.
+- **Forced moves**: When an elemental is displaced to an invalid hex, it must move. `pendingForcedMove` stores `{ player, validTargets }` and the UI handles it generically for any elemental type:
+  - **Earth on fire**: When fire is placed on earth's hex, earth must move 1 space (if trapped, fire wins)
+  - **Fire on lake**: When fire lands on a lake (e.g. via Swap Places), fire must move 1 space (if trapped, water wins)
+- **Special card (Aeterna) landing effects**: Movement special cards (`move-2-ignore`, `move-3-line`) trigger landing effects: earth on lake → forest conversion, water movement → fog movement option. Teleport cards (`teleport-shore`) do NOT trigger fog movement. All special card movements check win conditions and forced moves.

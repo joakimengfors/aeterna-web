@@ -390,20 +390,23 @@ export class HexInteraction {
         path = [fromHex, toHex];
       }
     }
-    // Firestorm: fire moves through connected fire tokens
+    // Firestorm: fire moves through connected fire tokens (fog blocks traversal)
     else if (action === 'firestorm') {
       const bfsPath = getShortestPath(fromHex, toHex, (h) => {
-        // Allow fire-token hexes and the destination (which may be 1 hex beyond fire)
         if (h === toHex) return true;
+        // Can traverse fire hexes but not through fog
+        if (this.state.hasToken(h, 'fog')) return false;
         return this.state.hasToken(h, 'fire');
       });
       path = [fromHex, ...bfsPath];
     }
-    // BFS-based movement: compute shortest path through walkable hexes
+    // BFS-based movement: compute shortest path avoiding obstacles and fog
     else if (action === 'uproot' || action === 'landslide') {
       const bfsPath = getShortestPath(fromHex, toHex, (h) => {
         const hex = this.state.getHex(h);
         if (type === 'minion') return true;
+        // Fog blocks pathfinding (except the destination itself)
+        if (h !== toHex && hex.tokens.includes('fog')) return false;
         if (type === 'earth') {
           if (hex.tokens.includes('fire')) return false;
           if (hex.tokens.includes('mountain')) return false;
@@ -812,7 +815,9 @@ export class HexInteraction {
         if (visited.has(n)) continue;
         visited.add(n);
         targets.push(n);
-        if (ignoreTerrain) {
+        // Fog stops movement — can enter but can't continue through
+        const hasFog = this.state.hasToken(n, 'fog');
+        if (ignoreTerrain && !hasFog) {
           queue.push([n, dist + 1]);
         }
       }
@@ -832,7 +837,11 @@ export class HexInteraction {
     const targets: HexId[] = [];
     const lines = getLineHexes(player.hexId, range);
     for (const { hexes } of lines) {
-      for (const h of hexes) targets.push(h);
+      for (const h of hexes) {
+        targets.push(h);
+        // Fog stops movement — can enter but can't continue past
+        if (this.state.hasToken(h, 'fog')) break;
+      }
     }
     this.validTargets = [...new Set(targets)];
     this.state.phase = 'EXECUTING';
