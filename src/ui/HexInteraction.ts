@@ -1551,15 +1551,19 @@ export class HexInteraction {
     this.board.render(this.state);
     this.board.highlightValidTargets(fm.validTargets, fm.player);
     this.topBar.render(this.state);
+    const reason = fm.player === 'fire'
+      ? `${NAMES.fire} landed on a lake`
+      : `Fire was placed on ${NAMES[fm.player]}'s hex`;
     const msg = this.isMultiplayer
-      ? `Fire was placed on ${NAMES[fm.player]}'s hex. You must move!`
-      : `Fire was placed on ${NAMES[fm.player]}'s hex. ${NAMES[fm.player]} must move!`;
+      ? `${reason}. You must move!`
+      : `${reason}. ${NAMES[fm.player]} must move!`;
     this.dialog.showInfo('Forced Move!', msg);
   }
 
   private handleForcedMoveClick(hexId: HexId) {
-    const earth = this.state.getPlayer('earth');
-    this.queueMoveAnimation('earth', earth.hexId, hexId);
+    const fm = this.state.pendingForcedMove!;
+    const player = this.state.getPlayer(fm.player);
+    this.queueMoveAnimation(fm.player, player.hexId, hexId);
     this.executor.executeForcedMove(hexId);
     if (this.checkWin()) return;
     this.board.render(this.state);
@@ -1687,6 +1691,14 @@ export class HexInteraction {
           this.executor.handleFireOnEarth();
         }
 
+        // Check if fire was swapped onto a lake → forced move
+        if (!this.state.pendingForcedMove) {
+          const fireHex = this.state.getPlayer('fire').hexId;
+          if (this.state.getHex(fireHex).tokens.includes('lake')) {
+            this.executor.handleLakeOnFire();
+          }
+        }
+
         this.state.addLog(`Swap Places — ${NAMES[el1]} and ${NAMES[el2]} swapped positions`);
         this.turnMgr.setActionMarker(this.selectedAction);
         this.activeSpecialCardId = null;
@@ -1711,10 +1723,16 @@ export class HexInteraction {
       if (this.selectedAction === 'special') {
         const targetHex = this.actionTargets[this.actionTargets.length - 1];
         const currentPlayer = this.state.currentPlayer;
+        const cardId = this.activeSpecialCardId;
+        const isMovement = cardId === 'move-2-ignore' || cardId === 'move-3-line';
 
         // Apply movement landing effects
         if (currentPlayer === 'earth') {
           this.executor.handleEarthConversion(targetHex);
+        }
+        // Fire landing on lake → forced move
+        if (currentPlayer === 'fire' && this.state.hasToken(targetHex, 'lake')) {
+          this.executor.handleLakeOnFire();
         }
 
         this.state.addLog(this.lastActionLabel || 'Used special ability');
@@ -1724,8 +1742,24 @@ export class HexInteraction {
         if (this.checkWin()) return;
         this.board.render(this.state);
 
-        // If water moved, offer fog movement
-        if (currentPlayer === 'water') {
+        // Check for forced moves first
+        if (this.state.pendingForcedMove) {
+          this.startForcedMovePhase(() => {
+            // After forced move, offer fog if water moved via movement card
+            if (isMovement && currentPlayer === 'water') {
+              const fogHexes = this.executor.getFogTokenHexes();
+              if (fogHexes.length > 0) {
+                this.startFogMovePhase(1, () => this.finishTurn());
+                return;
+              }
+            }
+            this.finishTurn();
+          });
+          return;
+        }
+
+        // Only movement cards (not teleport) trigger fog
+        if (isMovement && currentPlayer === 'water') {
           const fogHexes = this.executor.getFogTokenHexes();
           if (fogHexes.length > 0) {
             this.startFogMovePhase(1, () => this.finishTurn());

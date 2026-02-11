@@ -1151,20 +1151,36 @@ export class ActionExecutor {
     const validMoves = neighbors.filter(n => this.canEarthEnd(n));
 
     if (validMoves.length === 0) {
-      // Earth is trapped! Fire wins!
       this.state.winner = 'fire';
       this.state.addLog('Earth is trapped! Fire wins!');
     } else {
-      // Set pending forced move for UI to handle interactively
       this.state.pendingForcedMove = { player: 'earth', validTargets: validMoves };
     }
   }
 
-  /** Execute the forced move after Earth player chooses */
+  /** When Fire lands on a lake hex (e.g. via Swap Places), Fire must move off */
+  handleLakeOnFire() {
+    const fire = this.state.getPlayer('fire');
+    const neighbors = getNeighbors(fire.hexId);
+    const validMoves = neighbors.filter(n => this.canFireEnd(n));
+
+    if (validMoves.length === 0) {
+      this.state.winner = 'water';
+      this.state.addLog('Fire is trapped on a lake! Water wins!');
+    } else {
+      this.state.pendingForcedMove = { player: 'fire', validTargets: validMoves };
+    }
+  }
+
+  /** Execute the forced move after the displaced player chooses */
   executeForcedMove(targetHex: HexId) {
-    this.handleEarthConversion(targetHex);
-    this.state.setElementalOnHex(targetHex, 'earth');
-    this.state.addLog(`Earth forced to move to hex ${targetHex}.`);
+    const fm = this.state.pendingForcedMove;
+    if (!fm) return;
+    if (fm.player === 'earth') {
+      this.handleEarthConversion(targetHex);
+    }
+    this.state.setElementalOnHex(targetHex, fm.player);
+    this.state.addLog(`${fm.player === 'earth' ? 'Earth' : 'Fire'} forced to move to hex ${targetHex}.`);
     this.state.pendingForcedMove = null;
   }
 
