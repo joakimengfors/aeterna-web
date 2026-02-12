@@ -529,14 +529,18 @@ export class HexInteraction {
       }
       // Show action choice dialog when entering CHOOSE_ACTION
       else if (this.state.phase === 'CHOOSE_ACTION') {
-        const actions = getActionsForElemental(this.state.currentPlayer);
+        const allActions = getActionsForElemental(this.state.currentPlayer);
         const player = this.state.getPlayer(this.state.currentPlayer);
-        const specialCard = this.state.specialDeck.activeCard;
-        console.log('[renderAll] Showing action choice, actions=%d, blocked=%s',
-          actions.length, player.actionMarker);
+        const isUseAnyAbility = this.state.pendingAction === 'special';
+        // "Use Any Ability": block Special (already used the card) and lift cooldowns
+        const actions = allActions;
+        const blockedAction = isUseAnyAbility ? 'special' as ActionId : player.actionMarker;
+        const specialCard = isUseAnyAbility ? null : this.state.specialDeck.activeCard;
+        console.log('[renderAll] Showing action choice, actions=%d, blocked=%s, useAnyAbility=%s',
+          actions.length, blockedAction, isUseAnyAbility);
         this.dialog.showActionChoice(
           actions,
-          player.actionMarker,
+          blockedAction,
           specialCard ? specialCard.name : null,
           (actionId) => this.onActionSelected(actionId),
         );
@@ -611,15 +615,24 @@ export class HexInteraction {
   }
 
   private onSOTSkip() {
-    console.log('[SOT] Skip pressed, transitioning to CHOOSE_ACTION');
+    console.log('[SOT] Skip pressed, activeSpecialCardId=%s', this.activeSpecialCardId);
     // Clean up SOT interaction state to prevent stale targets from interfering
     this.validTargets = [];
     this.savedState = null;
     this.currentStep = 0;
     this.state.pendingAction = null;
     this.state.stepInstruction = '';
-    this.state.phase = 'CHOOSE_ACTION';
     this.state.sotUsed = false;
+
+    // If SOT was triggered by "Use Start of Turn" special card, finish the turn
+    if (this.activeSpecialCardId === 'start-of-turn') {
+      this.state.addLog(this.lastActionLabel || 'Used Start of Turn special card (skipped)');
+      this.turnMgr.setActionMarker('special');
+      this.finishTurn();
+      return;
+    }
+
+    this.state.phase = 'CHOOSE_ACTION';
     this.renderAll();
   }
 
@@ -644,7 +657,9 @@ export class HexInteraction {
     const playerName = NAMES[this.state.currentPlayer];
     const actionName = actionId === 'special'
       ? `SPECIAL: ${this.state.specialDeck.activeCard?.name || 'Special Ability'}`
-      : this.getActionDisplayName(actionId);
+      : this.state.pendingAction === 'special'
+        ? 'SPECIAL: Use a main ability'
+        : this.getActionDisplayName(actionId);
     this.lastActionLabel = `${playerName} used ${actionName}`;
 
     if (actionId === 'special') {
@@ -775,6 +790,8 @@ export class HexInteraction {
         this.state.specialDeck.useActiveCard();
         this.state.phase = 'START_OF_TURN';
         this.state.pendingAction = 'special';
+        // Clear selectedAction so hex clicks use SOT handler, not handleSpecialStep
+        this.selectedAction = null;
         this.onSOTStart();
         break;
       case 'move-2-ignore':
@@ -1027,17 +1044,34 @@ export class HexInteraction {
 
   /** After Water SOT completes, handle fog movement then advance to CHOOSE_ACTION */
   private finishSOT() {
+    // If SOT was triggered by "Use Start of Turn" special card, finish the turn
+    const fromSpecialCard = this.activeSpecialCardId === 'start-of-turn';
+
     if (this.state.currentPlayer === 'water' && this.state.pendingFogMove) {
       this.state.pendingFogMove = false;
       const fogHexes = this.executor.getFogTokenHexes();
       if (fogHexes.length > 0) {
         this.startFogMovePhase(1, () => {
-          this.state.phase = 'CHOOSE_ACTION';
-          this.renderAll();
+          if (fromSpecialCard) {
+            this.state.addLog(this.lastActionLabel || 'Used Start of Turn special card');
+            this.turnMgr.setActionMarker('special');
+            this.finishTurn();
+          } else {
+            this.state.phase = 'CHOOSE_ACTION';
+            this.renderAll();
+          }
         });
         return;
       }
     }
+
+    if (fromSpecialCard) {
+      this.state.addLog(this.lastActionLabel || 'Used Start of Turn special card');
+      this.turnMgr.setActionMarker('special');
+      this.finishTurn();
+      return;
+    }
+
     this.state.phase = 'CHOOSE_ACTION';
     this.renderAll();
   }
